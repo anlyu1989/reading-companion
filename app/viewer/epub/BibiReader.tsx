@@ -197,7 +197,9 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
                 return worker
                     .start({
                         onUnhandledRequest: "bypass",
-                        waitUntilReady: true
+                        waitUntilReady: true,
+                        // 静的ファイルのキャッシュもする
+                        serviceWorker: { url: "/cacheServiceWorker.js" }
                     })
                     .then(() => {
                         setIsReadyBook(true);
@@ -210,12 +212,12 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
             console.debug("Service Worker is failed to start", error.message);
             console.error(error);
             // unregister worker
-            const registration = await navigator.serviceWorker.getRegistration();
-            if (registration) {
-                await registration.unregister();
-            }
-            // reload page
-            window.location.reload();
+            // const registration = await navigator.serviceWorker.getRegistration();
+            // if (registration) {
+            //     await registration.unregister();
+            // }
+            // // reload page
+            // // window.location.reload();
             return null;
         });
 
