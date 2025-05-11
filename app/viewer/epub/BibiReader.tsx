@@ -113,9 +113,8 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
         }
         console.debug("create mock server for", src, bookId);
         const initWorker = async () => {
-            const worker = await (
-                await getSetupWorker()
-            )(
+            const setupWorker = await getSetupWorker();
+            const worker = setupWorker(
                 // Bibi request
                 // 1. /META-INF/container.xml
                 // 2. /OEBPS/content.opf
@@ -222,6 +221,7 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
         });
 
         return () => {
+            setIsReadyBook(false);
             console.debug("Service Worker is stop on unmount");
             workerRef.current?.stop();
         };
