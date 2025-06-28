@@ -16,8 +16,13 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css}\"",
-    "prepare": "git config --local core.hooksPath .githooks",
-    "test": "node --test --require=ts-node/register app/**/*.test.ts pages/api/**/*.test.ts"
+    "prepare": "[ -d .git ] && git config --local core.hooksPath .githooks || echo 'Not a git repository, skipping prepare'",
+    "test": "node --test --require=ts-node/register app/**/*.test.ts pages/api/**/*.test.ts",
+    "test:playwright:run": "playwright test",
+    "test:playwright:ui": "playwright test --ui",
+    "test:playwright:onlyChanged": "playwright test --only-changed",
+    "test:playwright:ci": "playwright test --reporter=blob",
+    "test:playwright:report": "playwright show-report"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.9",
@@ -30,9 +35,9 @@
     "@react-pdf-viewer/full-screen": "^3.12.0",
     "@react-pdf-viewer/locales": "^1.0.0",
     "dropbox": "^10.34.0",
+    "msw": "^2.10.2",
     "exponential-backoff-generator": "^2.0.1",
     "husky": "^8.0.3",
-    "msw": "^2.7.1",
     "next": "^15.1.7",
     "pdfjs-dist": "3.1.81",
     "react": "18.3.1",
@@ -43,6 +48,7 @@
     "swr": "^2.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.53.1",
     "@types/node": "^20.11.16",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
