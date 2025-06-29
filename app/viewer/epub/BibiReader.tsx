@@ -135,7 +135,12 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
                 }),
                 http.get("/bibi-bookshelf/" + bookId + "/OEBPS/package.opf", async () => {
                     try {
-                        const epub = await fetch(src).then((res) => res.arrayBuffer());
+                        const epub = await fetch(src).then((res) => {
+                            if (!res.ok) {
+                                throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
+                            }
+                            return res.arrayBuffer();
+                        });
                         return new Response(epub, {
                             headers: {
                                 "Content-Length": epub.byteLength.toString(),
@@ -148,14 +153,20 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
                                 cause: error
                             })
                         );
-                        return new Response("Error", {
-                            status: 500
+                        return new Response("Service Temporarily Unavailable", {
+                            status: 503,
+                            headers: { "Retry-After": "5" }
                         });
                     }
                 }),
                 http.get("/bibi-bookshelf/" + bookId, async () => {
                     try {
-                        const epub = await fetch(src).then((res) => res.arrayBuffer());
+                        const epub = await fetch(src).then((res) => {
+                            if (!res.ok) {
+                                throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
+                            }
+                            return res.arrayBuffer();
+                        });
                         // Respond with the "ArrayBuffer".
                         return new Response(epub, {
                             headers: {
@@ -175,8 +186,10 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
                             noCache: true
                         });
                         console.debug("disable cache for", props.id);
-                        return new Response("Error", {
-                            status: 500
+                        // モバイル端末では一時的な問題の可能性があるため、503を返してリトライを促す
+                        return new Response("Service Temporarily Unavailable", {
+                            status: 503,
+                            headers: { "Retry-After": "5" }
                         });
                     }
                 })
@@ -184,10 +197,13 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
             return worker;
         };
 
+        // Setup Service Worker timeout
+        const timeoutMs = 10_000;
+
         const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => {
                 reject(new Error("Service Worker is timeout"));
-            }, 3_000);
+            }, timeoutMs);
         });
 
         const workerPromise = Promise.race([
@@ -205,15 +221,29 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
             }),
             timeoutPromise
         ]).catch(async (error) => {
-            console.debug("Service Worker is failed to start", error.message);
+            console.debug("Service Worker is failed to start", {
+                message: error.message,
+                userAgent: navigator.userAgent,
+                connectionType: (navigator as any)?.connection?.effectiveType,
+                memoryInfo: (performance as any)?.memory
+            });
             console.error(error);
+
             // unregister worker
-            const registration = await navigator.serviceWorker.getRegistration();
-            if (registration) {
-                await registration.unregister();
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    await registration.unregister();
+                    console.debug("Service Worker unregistered successfully");
+                }
+            } catch (unregisterError) {
+                console.error("Failed to unregister Service Worker:", unregisterError);
             }
-            // reload page
-            // window.location.reload();
+
+            // モバイル端末では自動リトライまたは手動リロードを促す
+            if (confirm("EPUBの読み込みに失敗しました。ページをリロードしますか？")) {
+                window.location.reload();
+            }
             return null;
         });
 
@@ -223,12 +253,22 @@ const useEpubServiceWorker = (props: { id: string; src?: string; initialPage?: s
             workerRef.current?.stop();
         };
     }, [bookId, set, props.id, props.src]);
-    // on hide page, stop worker
-    // Note: SW is required when loading page.
-    // After loading page, SW is not required.
+    // モバイル端末では、ページの可視性変更時のService Worker停止を制限
+    // バックグラウンドに移る際の即座の停止は避け、遅延させる
     usePageVisibilityHide(() => {
-        console.debug("Service Worker stop on hide page");
-        workerRef.current?.stop();
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            // モバイルでは1秒待ってから停止（すぐに戻ってくる可能性があるため）
+            setTimeout(() => {
+                if (document.visibilityState === "hidden") {
+                    console.debug("Service Worker stop on hide page (mobile delayed)");
+                    workerRef.current?.stop();
+                }
+            }, 1000);
+        } else {
+            console.debug("Service Worker stop on hide page");
+            workerRef.current?.stop();
+        }
     });
     const bookUrl = useMemo(() => {
         const url = new URL("/bibi/index.html", location.href);
