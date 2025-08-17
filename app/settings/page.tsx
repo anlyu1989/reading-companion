@@ -115,7 +115,8 @@ export default function Page() {
                     <h2>Tools</h2>
                     <ul>
                         <li>
-                            <Link href={"/import"}>Import Highlights</Link> - Import highlights from Kindle or O'Reilly
+                            <Link href={"/import"}>Import Highlights</Link> - Import highlights from Kindle or
+                            O&apos;Reilly
                         </li>
                         <li>
                             <Link href={"/settings/clear-cache"}>Clear Cache</Link>
