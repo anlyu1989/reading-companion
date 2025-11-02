@@ -697,8 +697,8 @@ export const BibiReader: FC<BibiReaderProps> = (props) => {
                 title={"Stock Memo"}
                 style={{
                     position: "fixed",
-                    left: 0,
-                    bottom: 0,
+                    left: "env(safe-area-inset-left, 0)",
+                    bottom: "env(safe-area-inset-bottom, 0)",
                     zIndex: 1000,
                     padding: "1rem",
                     borderRadius: "4px"
@@ -714,8 +714,8 @@ export const BibiReader: FC<BibiReaderProps> = (props) => {
                 title={"Add Memo"}
                 style={{
                     position: "fixed",
-                    right: 0,
-                    bottom: 0,
+                    right: "env(safe-area-inset-right, 0)",
+                    bottom: "env(safe-area-inset-bottom, 0)",
                     zIndex: 1000,
                     padding: "1rem",
                     borderRadius: "4px"
