@@ -18,6 +18,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useOnetimeStorage } from "../../settings/TemporaryStorage";
 import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
+import styles from "./BibiReader.module.css";
 
 const getSetupWorker = async () => {
     const { setupWorker } = await import("msw/browser");
@@ -691,7 +692,7 @@ export const BibiReader: FC<BibiReaderProps> = (props) => {
                 </button>
             </div>
             <button
-                className="Button small violet"
+                className={`Button small violet ${styles.memoButton}`}
                 hidden={!hasCompletedNotionSettings || menuState === "open"}
                 disabled={!canMemoContent || isAddingMemo}
                 title={"Stock Memo"}
@@ -701,14 +702,14 @@ export const BibiReader: FC<BibiReaderProps> = (props) => {
                     bottom: "env(safe-area-inset-bottom, 0)",
                     zIndex: 1000,
                     padding: "1rem",
-                    borderRadius: "4px"
+                    fontSize: "1rem"
                 }}
                 onClick={onClickStockMemo}
             >
                 📁+{memoStock.length}
             </button>
             <button
-                className="Button small violet"
+                className={`Button small violet ${styles.memoButton}`}
                 hidden={!hasCompletedNotionSettings || menuState === "open"}
                 disabled={!enableMemoButton}
                 title={"Add Memo"}
@@ -718,7 +719,7 @@ export const BibiReader: FC<BibiReaderProps> = (props) => {
                     bottom: "env(safe-area-inset-bottom, 0)",
                     zIndex: 1000,
                     padding: "1rem",
-                    borderRadius: "4px"
+                    fontSize: "1rem"
                 }}
                 onClick={onClickMemo}
             >
