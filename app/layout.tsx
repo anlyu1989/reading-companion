@@ -1,6 +1,6 @@
 import "./global.css";
 import "./sakura.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
     title: "mubook-hon",
     description: "mubook-hon is a web-based epub/pdf reader",
@@ -10,6 +10,12 @@ export const metadata: Metadata = {
         shortcut: "/favicon.ico",
         apple: "/icons/apple-touch-icon.png"
     }
+};
+
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
