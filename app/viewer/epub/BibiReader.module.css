@@ -3,21 +3,21 @@
     border-radius: 4px;
 }
 
-/* タップ領域を常に拡張 */
-.memoButton::before {
-    content: "";
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    bottom: -8px;
-    left: -8px;
-}
-
-/* safe area がサポートされている環境（モバイル）でのみ丸みをつける */
+/* safe area がサポートされている環境（モバイル）でのみ丸みをつけ、タップ領域を拡張 */
 @supports (padding: env(safe-area-inset-bottom)) {
     .memoButton {
         border-radius: 24px;
         padding: 1rem 1.25rem;
         min-height: 48px;
+    }
+
+    /* タップ領域を拡張 */
+    .memoButton::before {
+        content: "";
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        bottom: -8px;
+        left: -8px;
     }
 }
