@@ -45,8 +45,8 @@ const NOTION_API_BASE_URL = USER_DEFINED_NOTION_BASE_URL
       ? "https://mubook-hon.vercel.app/api/notion-proxy"
       : "http://localhost:3000/api/notion-proxy";
 
-// ファイルサイズ制限 (無料プランは5MB)
-const MAX_FILE_SIZE_MB = 5;
+// ファイルサイズ制限
+const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Notion File Upload APIがサポートしていない形式の変換マップ
