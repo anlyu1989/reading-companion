@@ -24,6 +24,60 @@ const openDB = (dbName: string, storeName: string): Promise<IDBDatabase> => {
 const createIDBCache = async <Data = unknown>(db: IDBDatabase, storeName: string): Promise<Cache<Data>> => {
     const memoryCache = new Map<string, CacheEntry<Data>>();
 
+    // Convert Blob to ArrayBuffer for stable IndexedDB storage
+    const serializeForStorage = async (value: CacheEntry<Data>): Promise<CacheEntry<Data>> => {
+        const data = value.state?.data as Record<string, unknown> | undefined;
+        if (data && data.fileBlob instanceof Blob) {
+            const arrayBuffer = await data.fileBlob.arrayBuffer();
+            return {
+                ...value,
+                state: {
+                    ...value.state,
+                    data: {
+                        ...data,
+                        fileBlob: undefined,
+                        _fileArrayBuffer: arrayBuffer,
+                        _fileBlobType: data.fileBlob.type
+                    } as Data
+                }
+            };
+        }
+        return value;
+    };
+
+    // Convert ArrayBuffer back to Blob when loading from IndexedDB
+    const deserializeFromStorage = (value: CacheEntry<Data>): CacheEntry<Data> => {
+        const data = value.state?.data as Record<string, unknown> | undefined;
+        if (data && data._fileArrayBuffer instanceof ArrayBuffer) {
+            // Determine MIME type: use stored type, or infer from filename
+            let mimeType = data._fileBlobType as string | undefined;
+            if (!mimeType || mimeType === "application/octet-stream") {
+                const fileName = (data.name as string) || "";
+                if (fileName.endsWith(".epub")) {
+                    mimeType = "application/epub+zip";
+                } else if (fileName.endsWith(".pdf")) {
+                    mimeType = "application/pdf";
+                } else {
+                    mimeType = "application/octet-stream";
+                }
+            }
+            const blob = new Blob([data._fileArrayBuffer], { type: mimeType });
+            return {
+                ...value,
+                state: {
+                    ...value.state,
+                    data: {
+                        ...data,
+                        fileBlob: blob,
+                        _fileArrayBuffer: undefined,
+                        _fileBlobType: undefined
+                    } as Data
+                }
+            };
+        }
+        return value;
+    };
+
     // Load all data from IndexedDB into memory cache
     const loadFromDB = (): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -35,7 +89,9 @@ const createIDBCache = async <Data = unknown>(db: IDBDatabase, storeName: string
             request.onsuccess = () => {
                 const cursor = request.result;
                 if (cursor) {
-                    memoryCache.set(cursor.key as string, cursor.value as CacheEntry<Data>);
+                    // Deserialize ArrayBuffer back to Blob
+                    const deserialized = deserializeFromStorage(cursor.value as CacheEntry<Data>);
+                    memoryCache.set(cursor.key as string, deserialized);
                     cursor.continue();
                 } else {
                     resolve();
@@ -44,15 +100,16 @@ const createIDBCache = async <Data = unknown>(db: IDBDatabase, storeName: string
         });
     };
 
-    const saveToDB = (key: string, value: CacheEntry<Data>): void => {
+    const saveToDB = async (key: string, value: CacheEntry<Data>): Promise<void> => {
         // Skip saving if value is a Symbol (like NO_BOOK_DATA)
         if (typeof value.state?.data === "symbol") {
             return;
         }
         try {
+            const serialized = await serializeForStorage(value);
             const transaction = db.transaction(storeName, "readwrite");
             const store = transaction.objectStore(storeName);
-            store.put(value, key);
+            store.put(serialized, key);
         } catch (e) {
             console.error("Failed to save to IndexedDB:", e);
         }
