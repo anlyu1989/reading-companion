@@ -266,12 +266,21 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     setLatestRelocateDetail(detail);
                 });
 
+                // Disable swipe gestures to prevent conflict with text selection
+                const disableSwipe = (e: TouchEvent) => {
+                    if (e.touches.length > 1) return; // Allow pinch zoom
+                    e.stopImmediatePropagation();
+                };
+
                 view.addEventListener("load", (e: Event) => {
                     const detail = (e as CustomEvent<{ doc: Document; index: number }>).detail;
                     console.debug("load", detail);
 
                     // Add keyboard event listener to the loaded document
                     detail.doc.addEventListener("keydown", handleKeydown);
+
+                    // Disable swipe in each loaded document
+                    detail.doc.addEventListener("touchmove", disableSwipe, { capture: true });
 
                     // Add selection change listener
                     detail.doc.addEventListener("selectionchange", () => {
@@ -327,14 +336,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     showTextStart: !lastLocation
                 });
 
-                // Disable swipe gestures to prevent conflict with text selection
-                // Runtime patch: capture touchmove and stop propagation to foliate-js
-                const disableSwipe = (e: TouchEvent) => {
-                    // Allow pinch zoom (multi-touch)
-                    if (e.touches.length > 1) return;
-                    // Stop swipe from triggering page turn
-                    e.stopImmediatePropagation();
-                };
+                // Also add to view itself for redundancy
                 view.addEventListener("touchmove", disableSwipe, { capture: true });
 
                 isInitialized.current = true;
