@@ -1034,7 +1034,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                             position: "fixed",
                             left: "env(safe-area-inset-left, 0)",
                             bottom: "env(safe-area-inset-bottom, 0)",
-                            zIndex: 1000
+                            zIndex: 1000,
+                            userSelect: "none",
+                            WebkitUserSelect: "none"
                         }}
                         onClick={onClickStockMemo}
                     >
@@ -1048,7 +1050,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                             position: "fixed",
                             right: "env(safe-area-inset-right, 0)",
                             bottom: "env(safe-area-inset-bottom, 0)",
-                            zIndex: 1000
+                            zIndex: 1000,
+                            userSelect: "none",
+                            WebkitUserSelect: "none"
                         }}
                         onClick={onClickMemo}
                     >
