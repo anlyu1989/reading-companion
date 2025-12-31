@@ -1,6 +1,45 @@
 .viewerContainer {
     position: relative;
-    touch-action: pan-y;
+}
+
+.menuTrigger {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 500;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.menuTrigger::after {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    background: rgba(128, 128, 128, 0.25);
+    border-radius: 50%;
+}
+
+/* Mobile: larger menu trigger area */
+@media (pointer: coarse) {
+    .menuTrigger {
+        width: 200px;
+        height: 60px;
+    }
+
+    .menuTrigger::after {
+        width: 8px;
+        height: 8px;
+        top: 16px;
+    }
 }
 
 .menuBar {
@@ -36,33 +75,29 @@
 
 .navButton {
     position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 0;
+    bottom: 0;
     width: 48px;
-    height: 100px;
+    height: 100%;
     background: transparent;
     border: none;
-    font-size: 48px;
-    color: rgba(0, 0, 0, 0.2);
+    font-size: 0;
+    color: transparent;
     cursor: pointer;
     z-index: 100;
-    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    outline: none;
 }
 
-.navButton:hover {
-    color: rgba(0, 0, 0, 0.5);
+.navButton:focus {
+    outline: none;
 }
 
 /* Mobile: larger tap target */
 @media (pointer: coarse) {
     .navButton {
-        width: 60px;
-        height: 150px;
-        opacity: 0;
-    }
-
-    .navButton:active {
-        opacity: 1;
+        width: 80px;
     }
 }
 
