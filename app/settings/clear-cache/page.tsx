@@ -1,26 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
+import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
 
 export default function Page() {
-    const [isMigrating, setIsMigrating] = useState(false);
+    const [isClearing, setIsClearing] = useState(true);
     useEffect(() => {
         async function main() {
             try {
-                window.indexedDB.databases().then((r) => {
-                    for (let i = 0; i < r.length; i++) {
-                        // @ts-ignore
-                        window.indexedDB.deleteDatabase(r[i].name);
-                    }
-                });
-            } catch (error: any) {
+                await clearIndexedDBCache();
+            } catch (error: unknown) {
                 console.error(error);
-                alert(error.message);
+                alert(error instanceof Error ? error.message : String(error));
             } finally {
-                setIsMigrating(false);
+                setIsClearing(false);
             }
         }
 
         main();
     }, []);
-    return <div className={"main"}>{isMigrating ? "Clearing..." : "Cleared"}</div>;
+    return <div className={"main"}>{isClearing ? "Clearing..." : "Cleared"}</div>;
 }

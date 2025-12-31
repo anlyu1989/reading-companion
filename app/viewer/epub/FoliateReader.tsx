@@ -13,6 +13,7 @@ import { useToast } from "../useToast";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
+import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
 import styles from "./FoliateReader.module.css";
 
 export type FoliateReaderProps = {
@@ -731,10 +732,42 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     // Show error if foliate failed to initialize
     if (viewerState.status === "error") {
+        const handleClearCacheAndReload = async () => {
+            try {
+                await clearIndexedDBCache();
+                window.location.reload();
+            } catch (error) {
+                console.error("Failed to clear cache:", error);
+                window.location.reload();
+            }
+        };
+
         return (
-            <div style={{ padding: "20px", color: "red" }}>
-                <h2>Failed to load EPUB viewer</h2>
-                <p>{viewerState.error}</p>
+            <div style={{ padding: "20px" }}>
+                <h2 style={{ color: "red" }}>Failed to load EPUB viewer</h2>
+                <p style={{ color: "red" }}>{viewerState.error}</p>
+                <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+                    <button
+                        onClick={handleClearCacheAndReload}
+                        style={{
+                            padding: "10px 20px",
+                            fontSize: "14px",
+                            cursor: "pointer"
+                        }}
+                    >
+                        Clear Cache & Reload
+                    </button>
+                    <button
+                        onClick={() => (window.location.href = "/")}
+                        style={{
+                            padding: "10px 20px",
+                            fontSize: "14px",
+                            cursor: "pointer"
+                        }}
+                    >
+                        Back to Home
+                    </button>
+                </div>
             </div>
         );
     }
