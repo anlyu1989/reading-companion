@@ -24,6 +24,7 @@ export type FoliateReaderProps = {
     initialPage?: string;
     initialMarker?: string;
     translation?: boolean;
+    onClearCache?: () => Promise<unknown>;
 };
 
 type BookMetadata = {
@@ -832,6 +833,10 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     if (viewerState.status === "error") {
         const handleClearCacheAndReload = async () => {
             try {
+                // Clear both SWR cache and IndexedDB cache
+                if (props.onClearCache) {
+                    await props.onClearCache();
+                }
                 await clearIndexedDBCache();
                 window.location.reload();
             } catch (error) {
