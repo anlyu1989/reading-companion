@@ -237,8 +237,8 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     // Initialize foliate-view
     useEffect(() => {
-        // Only initialize once when we have src and are in waiting-src state
-        if (!props.src || viewerState.status !== "waiting-src") {
+        // Only initialize once when we have src or fileBlob and are in waiting-src state
+        if ((!props.src && !props.fileBlob) || viewerState.status !== "waiting-src") {
             return;
         }
 
@@ -348,20 +348,26 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     containerRef.current.appendChild(view);
                 }
 
-                // Fetch and open the book
-                if (!props.src) {
-                    throw new Error("No src provided");
+                // Get the book blob - prefer direct blob over fetching from URL
+                let blob: Blob;
+                if (props.fileBlob && props.fileBlob.size > 0) {
+                    console.debug("[FoliateReader] Using direct fileBlob, size:", props.fileBlob.size);
+                    blob = props.fileBlob;
+                } else if (props.src) {
+                    console.debug("[FoliateReader] Fetching book from:", props.src.substring(0, 100));
+                    const response = await fetch(props.src);
+                    if (!response.ok) {
+                        throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+                    }
+                    console.debug("[FoliateReader] Fetch response:", response.status, "type:", response.type);
+                    blob = await response.blob();
+                    console.debug("[FoliateReader] Blob size:", blob.size, "type:", blob.type);
+                } else {
+                    throw new Error("No src or fileBlob provided");
                 }
-                console.debug("[FoliateReader] Fetching book from:", props.src.substring(0, 100));
-                const response = await fetch(props.src);
-                if (!response.ok) {
-                    throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-                }
-                console.debug("[FoliateReader] Fetch response:", response.status, "type:", response.type);
-                const blob = await response.blob();
-                console.debug("[FoliateReader] Blob size:", blob.size, "type:", blob.type);
+
                 if (blob.size === 0) {
-                    throw new Error("Fetched blob is empty");
+                    throw new Error("Book blob is empty");
                 }
                 const file = new File([blob], props.bookFileName || "book.epub", {
                     type: "application/epub+zip"
@@ -438,6 +444,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         props.src,
+        props.fileBlob,
         props.bookFileName,
         props.id,
         props.initialMarker,
