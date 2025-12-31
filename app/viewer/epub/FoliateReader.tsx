@@ -343,25 +343,51 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         }
                     });
 
-                    // Add click handler for navigation on iframe content
-                    detail.doc.addEventListener("click", (clickEvent: MouseEvent) => {
+                    // Add pointer event handlers for navigation on iframe content
+                    const TAP_THRESHOLD_MS = 300;
+                    const MOVE_THRESHOLD_PX = 10;
+                    let pointerStart: { time: number; x: number; y: number } | null = null;
+
+                    detail.doc.addEventListener("pointerdown", (e: PointerEvent) => {
+                        if (!e.isPrimary) return;
+                        pointerStart = { time: Date.now(), x: e.screenX, y: e.screenY };
+                    });
+
+                    detail.doc.addEventListener("pointerup", (e: PointerEvent) => {
+                        if (!e.isPrimary) return;
+                        const start = pointerStart;
+                        pointerStart = null;
+
+                        if (!start) return;
+
+                        // Check timing - ignore long press (used for selection)
+                        const duration = Date.now() - start.time;
+                        if (duration > TAP_THRESHOLD_MS) return;
+
+                        // Check movement - ignore drag
+                        const dx = Math.abs(e.screenX - start.x);
+                        const dy = Math.abs(e.screenY - start.y);
+                        if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) return;
+
                         // Ignore if there's a text selection
                         const selection = detail.doc.getSelection();
-                        if (selection && selection.toString().trim()) {
-                            return;
-                        }
+                        if (selection && selection.toString().trim()) return;
 
                         // Use screen coordinates and window width for accurate position
                         // (iframe's clientX is relative to its very wide internal document)
                         const viewportWidth = window.innerWidth;
                         const navTapWidth = Math.max(60, Math.min(150, viewportWidth * 0.2));
-                        const x = clickEvent.screenX - window.screenX;
+                        const x = e.screenX - window.screenX;
 
                         if (x < navTapWidth) {
                             view.goLeft();
                         } else if (x > viewportWidth - navTapWidth) {
                             view.goRight();
                         }
+                    });
+
+                    detail.doc.addEventListener("pointercancel", () => {
+                        pointerStart = null;
                     });
                 });
 
