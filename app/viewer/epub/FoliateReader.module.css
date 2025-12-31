@@ -1,5 +1,6 @@
 .viewerContainer {
     position: relative;
+    overflow: clip;
 }
 
 .menuTrigger {
