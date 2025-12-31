@@ -846,26 +846,30 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         Back to Home
                     </button>
                 </div>
-                {viewerState.logs.length > 0 && (
-                    <details style={{ marginTop: "20px" }}>
-                        <summary style={{ cursor: "pointer", color: "#666" }}>Debug Logs</summary>
-                        <pre
-                            style={{
-                                marginTop: "10px",
-                                padding: "10px",
-                                background: "#f5f5f5",
-                                borderRadius: "4px",
-                                fontSize: "12px",
-                                overflow: "auto",
-                                maxHeight: "300px",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-all"
-                            }}
-                        >
-                            {viewerState.logs.join("\n")}
-                        </pre>
-                    </details>
-                )}
+                <details style={{ marginTop: "20px" }}>
+                    <summary style={{ cursor: "pointer", color: "#666" }}>
+                        Debug Logs ({viewerState.logs.length})
+                    </summary>
+                    <pre
+                        style={{
+                            marginTop: "10px",
+                            padding: "10px",
+                            background: "#f5f5f5",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            overflow: "auto",
+                            maxHeight: "300px",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all"
+                        }}
+                    >
+                        {viewerState.logs.length > 0 ? viewerState.logs.join("\n") : "(No logs captured)"}
+                        {"\n\n--- Context ---"}
+                        {"\nsrc: " + (props.src ? props.src.substring(0, 100) + "..." : "undefined")}
+                        {"\nfileName: " + props.bookFileName}
+                        {"\nuserAgent: " + (typeof navigator !== "undefined" ? navigator.userAgent : "N/A")}
+                    </pre>
+                </details>
             </div>
         );
     }
