@@ -793,12 +793,25 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     // Navigation tap width (px) - taps within this distance from edge trigger page navigation
     const NAV_TAP_WIDTH = 60;
+    const TAP_THRESHOLD_MS = 300; // Max duration for a tap (vs long press)
+    const touchStartTimeRef = useRef<number>(0);
+
+    const handleContainerTouchStart = useCallback(() => {
+        touchStartTimeRef.current = Date.now();
+    }, []);
 
     const handleContainerClick = useCallback(
         (e: React.MouseEvent) => {
             if (viewerState.status !== "ready" || menuState !== "closed") {
                 return;
             }
+
+            // Ignore long press (used for selection)
+            const touchDuration = Date.now() - touchStartTimeRef.current;
+            if (touchStartTimeRef.current > 0 && touchDuration > TAP_THRESHOLD_MS) {
+                return;
+            }
+
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
 
@@ -1074,6 +1087,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             <div
                 ref={containerRef}
                 className={styles.viewerContainer}
+                onTouchStart={handleContainerTouchStart}
                 onClick={handleContainerClick}
                 style={{
                     width: "100%",
