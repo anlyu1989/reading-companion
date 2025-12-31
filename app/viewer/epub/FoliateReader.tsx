@@ -791,11 +791,11 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         setMenuState((prev) => (prev === "open" ? "closed" : "open"));
     }, []);
 
-    // Navigation tap width - 12% of screen width, clamped between 48px and 120px
+    // Navigation tap width - 20% of screen width (Apple Books style), clamped between 60px and 150px
     const getNavTapWidth = useCallback(() => {
-        if (typeof window === "undefined") return 80;
-        const width = window.innerWidth * 0.12;
-        return Math.max(48, Math.min(120, width));
+        if (typeof window === "undefined") return 100;
+        const width = window.innerWidth * 0.2;
+        return Math.max(60, Math.min(150, width));
     }, []);
     const TAP_THRESHOLD_MS = 300; // Max duration for a tap (vs long press)
     const MOVE_THRESHOLD_PX = 10; // Max movement for a tap (vs drag)
