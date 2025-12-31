@@ -160,7 +160,20 @@ type ViewerState =
     | { status: "error"; error: string; logs: string[] };
 
 // Height of memo button area (to prevent content from rendering under buttons)
-const MEMO_BUTTON_AREA_HEIGHT = 60;
+const MEMO_BUTTON_AREA_HEIGHT = 20;
+const MEMO_BUTTON_AREA_HEIGHT_PWA = 60;
+
+/**
+ * Check if the app is running in PWA standalone mode
+ */
+function isPWAStandaloneMode(): boolean {
+    if (typeof window === "undefined") return false;
+    return (
+        ("standalone" in navigator && (navigator as Navigator & { standalone: boolean }).standalone) ||
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: fullscreen)").matches
+    );
+}
 
 export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [viewerState, setViewerState] = useState<ViewerState>({ status: "waiting-src" });
@@ -1060,7 +1073,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 onClick={toggleMenu}
                 style={{
                     width: "100%",
-                    height: hasCompletedNotionSettings ? `calc(100% - ${MEMO_BUTTON_AREA_HEIGHT}px)` : "100%"
+                    height: hasCompletedNotionSettings
+                        ? `calc(100% - ${isPWAStandaloneMode() ? MEMO_BUTTON_AREA_HEIGHT_PWA : MEMO_BUTTON_AREA_HEIGHT}px)`
+                        : "100%"
                 }}
             />
 
