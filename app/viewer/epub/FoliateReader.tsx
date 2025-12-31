@@ -248,6 +248,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         const capturedLogs: string[] = [];
         const originalConsoleError = console.error;
         const originalConsoleWarn = console.warn;
+        const originalConsoleDebug = console.debug;
         const captureLog = (level: string, ...args: unknown[]) => {
             const message = args
                 .map((arg) => (arg instanceof Error ? arg.stack || arg.message : String(arg)))
@@ -262,10 +263,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             captureLog("WARN", ...args);
             originalConsoleWarn.apply(console, args);
         };
+        console.debug = (...args) => {
+            captureLog("DEBUG", ...args);
+            originalConsoleDebug.apply(console, args);
+        };
 
         const restoreConsole = () => {
             console.error = originalConsoleError;
             console.warn = originalConsoleWarn;
+            console.debug = originalConsoleDebug;
         };
 
         const initFoliate = async () => {
@@ -346,13 +352,29 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 if (!props.src) {
                     throw new Error("No src provided");
                 }
+                console.debug("[FoliateReader] Fetching book from:", props.src.substring(0, 100));
                 const response = await fetch(props.src);
+                if (!response.ok) {
+                    throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+                }
+                console.debug("[FoliateReader] Fetch response:", response.status, "type:", response.type);
                 const blob = await response.blob();
+                console.debug("[FoliateReader] Blob size:", blob.size, "type:", blob.type);
+                if (blob.size === 0) {
+                    throw new Error("Fetched blob is empty");
+                }
                 const file = new File([blob], props.bookFileName || "book.epub", {
                     type: "application/epub+zip"
                 });
+                console.debug("[FoliateReader] Opening file:", file.name, "size:", file.size);
 
-                await view.open(file);
+                try {
+                    await view.open(file);
+                    console.debug("[FoliateReader] Book opened successfully");
+                } catch (openError) {
+                    console.error("[FoliateReader] view.open failed:", openError);
+                    throw openError;
+                }
 
                 // Set styles
                 view.renderer.setStyles?.(
@@ -400,9 +422,18 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         initFoliate();
 
         return () => {
+            restoreConsole();
             if (viewRef.current) {
-                viewRef.current.close();
+                try {
+                    viewRef.current.close();
+                } catch (e) {
+                    console.warn("Error closing foliate view:", e);
+                }
+                // Remove from DOM
+                viewRef.current.remove();
+                viewRef.current = null;
             }
+            isInitialized.current = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
