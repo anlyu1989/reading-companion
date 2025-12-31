@@ -156,7 +156,7 @@ type ViewerState =
     | { status: "waiting-src" }
     | { status: "loading" }
     | { status: "ready" }
-    | { status: "error"; error: string };
+    | { status: "error"; error: string; logs: string[] };
 
 // Bottom margin for memo buttons (only needed in PWA standalone mode)
 const MEMO_BUTTON_AREA_HEIGHT_PWA = 20;
@@ -243,6 +243,31 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         }
 
         setViewerState({ status: "loading" });
+
+        // Capture logs during initialization for debugging
+        const capturedLogs: string[] = [];
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const captureLog = (level: string, ...args: unknown[]) => {
+            const message = args
+                .map((arg) => (arg instanceof Error ? arg.stack || arg.message : String(arg)))
+                .join(" ");
+            capturedLogs.push(`[${level}] ${message}`);
+        };
+        console.error = (...args) => {
+            captureLog("ERROR", ...args);
+            originalConsoleError.apply(console, args);
+        };
+        console.warn = (...args) => {
+            captureLog("WARN", ...args);
+            originalConsoleWarn.apply(console, args);
+        };
+
+        const restoreConsole = () => {
+            console.error = originalConsoleError;
+            console.warn = originalConsoleWarn;
+        };
+
         const initFoliate = async () => {
             try {
                 // Import foliate-js view module from public directory
@@ -359,10 +384,16 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 view.addEventListener("touchmove", disableSwipe, { capture: true });
 
                 isInitialized.current = true;
+                restoreConsole();
                 setViewerState({ status: "ready" });
             } catch (error) {
+                restoreConsole();
                 console.error("Failed to initialize foliate reader:", error);
-                setViewerState({ status: "error", error: error instanceof Error ? error.message : "Unknown error" });
+                setViewerState({
+                    status: "error",
+                    error: error instanceof Error ? error.message : "Unknown error",
+                    logs: capturedLogs
+                });
             }
         };
 
@@ -784,6 +815,26 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         Back to Home
                     </button>
                 </div>
+                {viewerState.logs.length > 0 && (
+                    <details style={{ marginTop: "20px" }}>
+                        <summary style={{ cursor: "pointer", color: "#666" }}>Debug Logs</summary>
+                        <pre
+                            style={{
+                                marginTop: "10px",
+                                padding: "10px",
+                                background: "#f5f5f5",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                overflow: "auto",
+                                maxHeight: "300px",
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-all"
+                            }}
+                        >
+                            {viewerState.logs.join("\n")}
+                        </pre>
+                    </details>
+                )}
             </div>
         );
     }
