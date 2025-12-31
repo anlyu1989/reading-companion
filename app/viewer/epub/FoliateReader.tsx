@@ -342,6 +342,27 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                             setCanMemoContent(true);
                         }
                     });
+
+                    // Add click handler for navigation on iframe content
+                    detail.doc.addEventListener("click", (clickEvent: MouseEvent) => {
+                        // Ignore if there's a text selection
+                        const selection = detail.doc.getSelection();
+                        if (selection && selection.toString().trim()) {
+                            return;
+                        }
+
+                        // Use screen coordinates and window width for accurate position
+                        // (iframe's clientX is relative to its very wide internal document)
+                        const viewportWidth = window.innerWidth;
+                        const navTapWidth = Math.max(60, Math.min(150, viewportWidth * 0.2));
+                        const x = clickEvent.screenX - window.screenX;
+
+                        if (x < navTapWidth) {
+                            view.goLeft();
+                        } else if (x > viewportWidth - navTapWidth) {
+                            view.goRight();
+                        }
+                    });
                 });
 
                 // Append to container
@@ -791,93 +812,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         setMenuState((prev) => (prev === "open" ? "closed" : "open"));
     }, []);
 
-    // Navigation tap width - 20% of screen width (Apple Books style), clamped between 60px and 150px
-    const getNavTapWidth = useCallback(() => {
-        if (typeof window === "undefined") return 100;
-        const width = window.innerWidth * 0.2;
-        return Math.max(60, Math.min(300, width));
-    }, []);
-    const TAP_THRESHOLD_MS = 100; // Max duration for a tap (vs long press)
-    const MOVE_THRESHOLD_PX = 50; // Max movement for a tap (vs drag)
-
-    const pointerStartRef = useRef<{ time: number; x: number; y: number } | null>(null);
-
-    const handlePointerDown = useCallback((e: React.PointerEvent) => {
-        // Only track primary pointer (ignore multi-touch secondary pointers)
-        if (!e.isPrimary) return;
-        pointerStartRef.current = {
-            time: Date.now(),
-            x: e.clientX,
-            y: e.clientY
-        };
-    }, []);
-
-    // Handle navigation based on tap position and timing
-    const handleNavigation = useCallback(
-        (clientX: number, clientY: number, rect: DOMRect) => {
-            const start = pointerStartRef.current;
-            pointerStartRef.current = null;
-
-            // Check timing if we have pointer start data
-            if (start) {
-                const duration = Date.now() - start.time;
-                if (duration > TAP_THRESHOLD_MS) {
-                    return; // Long press - used for selection
-                }
-
-                // Check movement
-                const dx = Math.abs(clientX - start.x);
-                const dy = Math.abs(clientY - start.y);
-                if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) {
-                    return; // Moved too much - not a tap
-                }
-            }
-
-            const x = clientX - rect.left;
-            const navTapWidth = getNavTapWidth();
-
-            if (x < navTapWidth) {
-                onClickPrev();
-            } else if (x > rect.width - navTapWidth) {
-                onClickNext();
-            } else {
-                toggleMenu();
-            }
-        },
-        [onClickPrev, onClickNext, toggleMenu, getNavTapWidth]
-    );
-
-    const handlePointerUp = useCallback(
-        (e: React.PointerEvent) => {
-            if (!e.isPrimary || viewerState.status !== "ready" || menuState !== "closed") {
-                pointerStartRef.current = null;
-                return;
-            }
-
-            const rect = e.currentTarget.getBoundingClientRect();
-            handleNavigation(e.clientX, e.clientY, rect);
-        },
-        [viewerState.status, menuState, handleNavigation]
-    );
-
-    // Fallback for click events (bubbles from iframe)
-    const handleClick = useCallback(
-        (e: React.MouseEvent) => {
-            if (viewerState.status !== "ready" || menuState !== "closed") {
-                return;
-            }
-
-            const rect = e.currentTarget.getBoundingClientRect();
-            handleNavigation(e.clientX, e.clientY, rect);
-        },
-        [viewerState.status, menuState, handleNavigation]
-    );
-
-    // Cancel navigation if pointer leaves container
-    const handlePointerCancel = useCallback(() => {
-        pointerStartRef.current = null;
-    }, []);
-
     const toggleLayoutMode = useCallback(() => {
         setLayoutMode((prev) => {
             const newMode = prev === "paginated" ? "scrolled" : "paginated";
@@ -1136,11 +1070,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             <div
                 ref={containerRef}
                 className={styles.viewerContainer}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-                onPointerLeave={handlePointerCancel}
-                onClick={handleClick}
                 style={{
                     width: "100%",
                     height: hasCompletedNotionSettings
