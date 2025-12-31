@@ -159,24 +159,8 @@ type ViewerState =
     | { status: "ready" }
     | { status: "error"; error: string; logs: string[] };
 
-// Bottom margin for memo buttons (only needed in PWA standalone mode)
-const MEMO_BUTTON_AREA_HEIGHT_PWA = 20;
-
-/**
- * Check if the app is running in PWA standalone mode
- * (iOS Safari "Add to Home Screen" or display-mode: standalone/fullscreen)
- */
-function isPWAStandaloneMode(): boolean {
-    if (typeof window === "undefined") return false;
-    return (
-        // iOS Safari standalone mode
-        ("standalone" in navigator && (navigator as Navigator & { standalone: boolean }).standalone) ||
-        // Standard display-mode: standalone
-        window.matchMedia("(display-mode: standalone)").matches ||
-        // Fullscreen mode
-        window.matchMedia("(display-mode: fullscreen)").matches
-    );
-}
+// Height of memo button area (to prevent content from rendering under buttons)
+const MEMO_BUTTON_AREA_HEIGHT = 60;
 
 export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [viewerState, setViewerState] = useState<ViewerState>({ status: "waiting-src" });
@@ -1076,10 +1060,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 onClick={toggleMenu}
                 style={{
                     width: "100%",
-                    height:
-                        hasCompletedNotionSettings && isPWAStandaloneMode()
-                            ? `calc(100% - ${MEMO_BUTTON_AREA_HEIGHT_PWA}px)`
-                            : "100%"
+                    height: hasCompletedNotionSettings ? `calc(100% - ${MEMO_BUTTON_AREA_HEIGHT}px)` : "100%"
                 }}
             />
 
