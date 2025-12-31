@@ -798,7 +798,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         return Math.max(60, Math.min(150, width));
     }, []);
     const TAP_THRESHOLD_MS = 100; // Max duration for a tap (vs long press)
-    const MOVE_THRESHOLD_PX = 10; // Max movement for a tap (vs drag)
+    const MOVE_THRESHOLD_PX = 50; // Max movement for a tap (vs drag)
 
     const pointerStartRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
