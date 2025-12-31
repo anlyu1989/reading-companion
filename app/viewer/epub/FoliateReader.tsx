@@ -791,6 +791,31 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         setMenuState((prev) => (prev === "open" ? "closed" : "open"));
     }, []);
 
+    // Navigation tap width (px) - taps within this distance from edge trigger page navigation
+    const NAV_TAP_WIDTH = 60;
+
+    const handleContainerClick = useCallback(
+        (e: React.MouseEvent) => {
+            if (viewerState.status !== "ready" || menuState !== "closed") {
+                return;
+            }
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+
+            if (x < NAV_TAP_WIDTH) {
+                // Left edge tap - previous page
+                onClickPrev();
+            } else if (x > rect.width - NAV_TAP_WIDTH) {
+                // Right edge tap - next page
+                onClickNext();
+            } else {
+                // Center tap - toggle menu
+                toggleMenu();
+            }
+        },
+        [viewerState.status, menuState, onClickPrev, onClickNext, toggleMenu]
+    );
+
     const toggleLayoutMode = useCallback(() => {
         setLayoutMode((prev) => {
             const newMode = prev === "paginated" ? "scrolled" : "paginated";
@@ -999,32 +1024,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 </div>
             )}
 
-            {/* Navigation buttons - left */}
-            <button
-                className={styles.navButton}
-                style={{
-                    left: 0,
-                    display: viewerState.status === "ready" && menuState === "closed" ? "flex" : "none"
-                }}
-                onClick={onClickPrev}
-                title="Previous page"
-            >
-                ‹
-            </button>
-
-            {/* Navigation buttons - right */}
-            <button
-                className={styles.navButton}
-                style={{
-                    right: 0,
-                    display: viewerState.status === "ready" && menuState === "closed" ? "flex" : "none"
-                }}
-                onClick={onClickNext}
-                title="Next page"
-            >
-                ›
-            </button>
-
             {/* Memo buttons */}
             {hasCompletedNotionSettings && viewerState.status === "ready" && menuState === "closed" && (
                 <div
@@ -1075,7 +1074,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             <div
                 ref={containerRef}
                 className={styles.viewerContainer}
-                onClick={toggleMenu}
+                onClick={handleContainerClick}
                 style={{
                     width: "100%",
                     height: hasCompletedNotionSettings
