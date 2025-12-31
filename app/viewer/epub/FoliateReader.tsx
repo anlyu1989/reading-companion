@@ -1025,18 +1025,30 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
             {/* Memo buttons */}
             {hasCompletedNotionSettings && viewerState.status === "ready" && menuState === "closed" && (
-                <>
+                <div
+                    style={{
+                        position: "fixed",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: "60px",
+                        paddingBottom: "env(safe-area-inset-bottom, 0)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-end",
+                        pointerEvents: "none",
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        zIndex: 1000
+                    }}
+                >
                     <button
                         className={`Button small violet ${styles.memoButton}`}
                         disabled={!canMemoContent || isAddingMemo}
                         title="Stock Memo"
                         style={{
-                            position: "fixed",
-                            left: "env(safe-area-inset-left, 0)",
-                            bottom: "env(safe-area-inset-bottom, 0)",
-                            zIndex: 1000,
-                            userSelect: "none",
-                            WebkitUserSelect: "none"
+                            pointerEvents: "auto",
+                            marginLeft: "env(safe-area-inset-left, 0)"
                         }}
                         onClick={onClickStockMemo}
                     >
@@ -1047,18 +1059,14 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         disabled={!enableMemoButton}
                         title="Add Memo"
                         style={{
-                            position: "fixed",
-                            right: "env(safe-area-inset-right, 0)",
-                            bottom: "env(safe-area-inset-bottom, 0)",
-                            zIndex: 1000,
-                            userSelect: "none",
-                            WebkitUserSelect: "none"
+                            pointerEvents: "auto",
+                            marginRight: "env(safe-area-inset-right, 0)"
                         }}
                         onClick={onClickMemo}
                     >
                         Memo
                     </button>
-                </>
+                </div>
             )}
 
             {/* Foliate view container */}
