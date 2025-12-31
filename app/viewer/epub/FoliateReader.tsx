@@ -1,12 +1,10 @@
 "use client";
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    FoliatePositionMarker,
-    BookItem,
     decodeBookMarker,
+    FoliatePositionMarker,
     hasDataBook,
     isFoliateBookItem,
-    isFoliatePositionMarker,
     NO_BOOK_DATA,
     useNotion
 } from "../../notion/useNotion";
@@ -159,10 +157,14 @@ type ViewerState =
     | { status: "ready" }
     | { status: "error"; error: string };
 
+// Bottom margin for memo buttons
+const MEMO_BUTTON_AREA_HEIGHT = 0;
+
 export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [viewerState, setViewerState] = useState<ViewerState>({ status: "waiting-src" });
     const [menuState, setMenuState] = useState<"open" | "closed">("closed");
     const [layoutMode, setLayoutMode] = useState<"paginated" | "scrolled">("paginated");
+    const [fontSize, setFontSize] = useState(100); // percentage
     const viewRef = useRef<FoliateView | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const isInitialized = useRef(false);
@@ -694,6 +696,34 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         });
     }, []);
 
+    const applyFontSize = useCallback((size: number) => {
+        const view = viewRef.current;
+        if (!view?.renderer?.setStyles) return;
+        view.renderer.setStyles(
+            getCSS({
+                spacing: 1.4,
+                justify: true,
+                hyphenate: true
+            }) + `\nhtml { font-size: ${size}% !important; }`
+        );
+    }, []);
+
+    const increaseFontSize = useCallback(() => {
+        setFontSize((prev) => {
+            const newSize = Math.min(prev + 10, 200);
+            applyFontSize(newSize);
+            return newSize;
+        });
+    }, [applyFontSize]);
+
+    const decreaseFontSize = useCallback(() => {
+        setFontSize((prev) => {
+            const newSize = Math.max(prev - 10, 50);
+            applyFontSize(newSize);
+            return newSize;
+        });
+    }, [applyFontSize]);
+
     const enableMemoButton = useMemo(() => {
         if (memoStock.length > 0) return true;
         return canMemoContent && !isAddingMemo;
@@ -746,6 +776,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     display: menuState === "open" ? "flex" : "none"
                 }}
             >
+                <button
+                    className={styles.menuButton}
+                    onClick={() => (window.location.href = "/")}
+                    title="Back to book list"
+                >
+                    ←
+                </button>
                 <button className={styles.menuButton} onClick={() => setShowTOC(!showTOC)} title="Table of Contents">
                     ☰
                 </button>
@@ -768,6 +805,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     title={layoutMode === "paginated" ? "Switch to scroll mode" : "Switch to page mode"}
                 >
                     {layoutMode === "paginated" ? "Scroll" : "Page"}
+                </button>
+                <button className={styles.menuButton} onClick={decreaseFontSize} title="Decrease font size">
+                    A-
+                </button>
+                <span style={{ fontSize: "12px", minWidth: "36px", textAlign: "center" }}>{fontSize}%</span>
+                <button className={styles.menuButton} onClick={increaseFontSize} title="Increase font size">
+                    A+
                 </button>
                 <button className={styles.menuButton} onClick={toggleMenu} title="Close menu">
                     ✕
@@ -855,7 +899,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 onClick={toggleMenu}
                 style={{
                     width: "100%",
-                    height: "100%"
+                    height: hasCompletedNotionSettings ? `calc(100% - ${MEMO_BUTTON_AREA_HEIGHT}px)` : "100%"
                 }}
             />
 
