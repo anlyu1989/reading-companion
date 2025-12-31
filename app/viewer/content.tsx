@@ -73,11 +73,7 @@ const useDropboxAPI = (dropbox: Dropbox | null, props: { fileId: string; noCache
                 throw error;
             });
     };
-    const {
-        data: downloadResponse,
-        error: itemListsError,
-        isLoading: isDownloading
-    } = useSWR(
+    const { data: downloadResponse, error: itemListsError } = useSWR(
         () =>
             dropbox
                 ? {
@@ -91,13 +87,6 @@ const useDropboxAPI = (dropbox: Dropbox | null, props: { fileId: string; noCache
             revalidateOnFocus: props.noCache
         }
     );
-    console.debug("[useDropboxAPI] SWR state", {
-        hasDropbox: !!dropbox,
-        isDownloading,
-        hasResponse: !!downloadResponse,
-        responseFileBlob: downloadResponse?.fileBlob?.size,
-        error: itemListsError?.message
-    });
     const removeCache = useCallback(() => {
         return mutate(
             () => {
@@ -206,13 +195,6 @@ const App = (
     const { fileBlobUrl, fileBlob, fileDisplayName, removeCache } = useDropboxAPI(dropboxClient, {
         fileId: id,
         noCache: onetimeStorage.get(id)?.noCache ?? false
-    });
-    console.debug("[App] Props for reader", {
-        hasDropboxClient: !!dropboxClient,
-        accessTokenStatus,
-        fileBlobUrl: fileBlobUrl?.substring(0, 50),
-        fileBlobSize: fileBlob?.size,
-        fileDisplayName
     });
     const [tooLoadLong, setTooLoadLong] = useState(false);
     useEffect(() => {

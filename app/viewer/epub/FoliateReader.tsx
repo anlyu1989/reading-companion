@@ -235,20 +235,11 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     // Initialize foliate-view
     useEffect(() => {
-        console.debug("[FoliateReader] useEffect triggered", {
-            hasSrc: !!props.src,
-            hasFileBlob: !!props.fileBlob,
-            fileBlobSize: props.fileBlob?.size,
-            viewerStatus: viewerState.status,
-            bookFileName: props.bookFileName
-        });
         // Only initialize once when we have src or fileBlob and are in waiting-src state
         if ((!props.src && !props.fileBlob) || viewerState.status !== "waiting-src") {
-            console.debug("[FoliateReader] Early return - conditions not met");
             return;
         }
 
-        console.debug("[FoliateReader] Starting initialization...");
         setViewerState({ status: "loading" });
 
         // Capture logs during initialization for debugging
