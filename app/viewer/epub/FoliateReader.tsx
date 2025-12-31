@@ -429,8 +429,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 restoreConsole();
                 setViewerState({ status: "ready" });
             } catch (error) {
-                restoreConsole();
+                // Log error before restoring console so it gets captured
                 console.error("Failed to initialize foliate reader:", error);
+                restoreConsole();
                 setViewerState({
                     status: "error",
                     error: error instanceof Error ? error.message : "Unknown error",
