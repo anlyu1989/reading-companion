@@ -791,43 +791,92 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         setMenuState((prev) => (prev === "open" ? "closed" : "open"));
     }, []);
 
-    // Navigation tap width (px) - taps within this distance from edge trigger page navigation
-    const NAV_TAP_WIDTH = 60;
+    // Navigation tap width - 12% of screen width, clamped between 48px and 120px
+    const getNavTapWidth = useCallback(() => {
+        if (typeof window === "undefined") return 80;
+        const width = window.innerWidth * 0.12;
+        return Math.max(48, Math.min(120, width));
+    }, []);
     const TAP_THRESHOLD_MS = 300; // Max duration for a tap (vs long press)
-    const touchStartTimeRef = useRef<number>(0);
+    const MOVE_THRESHOLD_PX = 10; // Max movement for a tap (vs drag)
 
-    const handleContainerTouchStart = useCallback(() => {
-        touchStartTimeRef.current = Date.now();
+    const pointerStartRef = useRef<{ time: number; x: number; y: number } | null>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        // Only track primary pointer (ignore multi-touch secondary pointers)
+        if (!e.isPrimary) return;
+        pointerStartRef.current = {
+            time: Date.now(),
+            x: e.clientX,
+            y: e.clientY
+        };
     }, []);
 
-    const handleContainerClick = useCallback(
+    // Handle navigation based on tap position and timing
+    const handleNavigation = useCallback(
+        (clientX: number, clientY: number, rect: DOMRect) => {
+            const start = pointerStartRef.current;
+            pointerStartRef.current = null;
+
+            // Check timing if we have pointer start data
+            if (start) {
+                const duration = Date.now() - start.time;
+                if (duration > TAP_THRESHOLD_MS) {
+                    return; // Long press - used for selection
+                }
+
+                // Check movement
+                const dx = Math.abs(clientX - start.x);
+                const dy = Math.abs(clientY - start.y);
+                if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) {
+                    return; // Moved too much - not a tap
+                }
+            }
+
+            const x = clientX - rect.left;
+            const navTapWidth = getNavTapWidth();
+
+            if (x < navTapWidth) {
+                onClickPrev();
+            } else if (x > rect.width - navTapWidth) {
+                onClickNext();
+            } else {
+                toggleMenu();
+            }
+        },
+        [onClickPrev, onClickNext, toggleMenu, getNavTapWidth]
+    );
+
+    const handlePointerUp = useCallback(
+        (e: React.PointerEvent) => {
+            if (!e.isPrimary || viewerState.status !== "ready" || menuState !== "closed") {
+                pointerStartRef.current = null;
+                return;
+            }
+
+            const rect = e.currentTarget.getBoundingClientRect();
+            handleNavigation(e.clientX, e.clientY, rect);
+        },
+        [viewerState.status, menuState, handleNavigation]
+    );
+
+    // Fallback for click events (bubbles from iframe)
+    const handleClick = useCallback(
         (e: React.MouseEvent) => {
             if (viewerState.status !== "ready" || menuState !== "closed") {
                 return;
             }
 
-            // Ignore long press (used for selection)
-            const touchDuration = Date.now() - touchStartTimeRef.current;
-            if (touchStartTimeRef.current > 0 && touchDuration > TAP_THRESHOLD_MS) {
-                return;
-            }
-
             const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-
-            if (x < NAV_TAP_WIDTH) {
-                // Left edge tap - previous page
-                onClickPrev();
-            } else if (x > rect.width - NAV_TAP_WIDTH) {
-                // Right edge tap - next page
-                onClickNext();
-            } else {
-                // Center tap - toggle menu
-                toggleMenu();
-            }
+            handleNavigation(e.clientX, e.clientY, rect);
         },
-        [viewerState.status, menuState, onClickPrev, onClickNext, toggleMenu]
+        [viewerState.status, menuState, handleNavigation]
     );
+
+    // Cancel navigation if pointer leaves container
+    const handlePointerCancel = useCallback(() => {
+        pointerStartRef.current = null;
+    }, []);
 
     const toggleLayoutMode = useCallback(() => {
         setLayoutMode((prev) => {
@@ -1087,8 +1136,11 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             <div
                 ref={containerRef}
                 className={styles.viewerContainer}
-                onTouchStart={handleContainerTouchStart}
-                onClick={handleContainerClick}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                onPointerLeave={handlePointerCancel}
+                onClick={handleClick}
                 style={{
                     width: "100%",
                     height: hasCompletedNotionSettings
