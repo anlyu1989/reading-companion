@@ -312,6 +312,11 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     setCanMemoContent(true);
                     // Store latest relocate detail for use when updating book status
                     setLatestRelocateDetail(detail);
+                    // Clear any stuck selection/focus state on page change
+                    if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                    }
+                    window.getSelection()?.removeAllRanges();
                 });
 
                 // Disable swipe gestures to prevent conflict with text selection
