@@ -349,11 +349,23 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 }
 
                 // Get the book blob - prefer direct blob over fetching from URL
-                let blob: Blob;
+                let blob: Blob | undefined;
                 if (props.fileBlob && props.fileBlob.size > 0) {
                     console.debug("[FoliateReader] Using direct fileBlob, size:", props.fileBlob.size);
-                    blob = props.fileBlob;
-                } else if (props.src) {
+                    // Validate blob is readable (Safari can have stale blobs from cache)
+                    try {
+                        await props.fileBlob.slice(0, 1).arrayBuffer();
+                        blob = props.fileBlob;
+                    } catch (blobError) {
+                        console.warn("[FoliateReader] fileBlob validation failed, falling back to fetch:", blobError);
+                        if (!props.src) {
+                            throw new Error("fileBlob is invalid and no src available");
+                        }
+                        // Fall through to fetch
+                        blob = undefined;
+                    }
+                }
+                if (!blob && props.src) {
                     console.debug("[FoliateReader] Fetching book from:", props.src.substring(0, 100));
                     const response = await fetch(props.src);
                     if (!response.ok) {
@@ -362,8 +374,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     console.debug("[FoliateReader] Fetch response:", response.status, "type:", response.type);
                     blob = await response.blob();
                     console.debug("[FoliateReader] Blob size:", blob.size, "type:", blob.type);
-                } else {
-                    throw new Error("No src or fileBlob provided");
+                }
+                if (!blob) {
+                    throw new Error("No valid src or fileBlob available");
                 }
 
                 if (blob.size === 0) {
@@ -873,6 +886,10 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         {viewerState.logs.length > 0 ? viewerState.logs.join("\n") : "(No logs captured)"}
                         {"\n\n--- Context ---"}
                         {"\nsrc: " + (props.src ? props.src.substring(0, 100) + "..." : "undefined")}
+                        {"\nfileBlob: " +
+                            (props.fileBlob
+                                ? `Blob(size=${props.fileBlob.size}, type=${props.fileBlob.type})`
+                                : "undefined")}
                         {"\nfileName: " + props.bookFileName}
                         {"\nuserAgent: " + (typeof navigator !== "undefined" ? navigator.userAgent : "N/A")}
                     </pre>
