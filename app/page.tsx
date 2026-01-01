@@ -203,7 +203,7 @@ const HomeContent: FC = () => {
                             type={"text"}
                             value={searchInput}
                             onInput={onInputSearch}
-                            style={{ flex: 1, marginLeft: "0.5em" }}
+                            style={{ flex: 1, marginLeft: "0.5em", fontSize: "16px" }}
                         />
                     </form>
                     <ul>
