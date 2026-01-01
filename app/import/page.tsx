@@ -1,7 +1,101 @@
 "use client";
 import "../sakura.css";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KindlePositionMarker, useNotion } from "../notion/useNotion";
+
+const bookmarkletButtonStyle = `
+.bookmarklet-button:hover {
+    color: #f9f9f9 !important;
+    border-bottom: none !important;
+}
+`;
+
+const KINDLE_CODE = `(async function (){
+    const { parsePage } = await import('https://esm.sh/kindle-highlight-to-markdown');
+    const o = parsePage(window);
+    const result = {
+        fileId: o.asin,
+        fileName: o.title,
+        title: o.title,
+        currentPage: 0,
+        totalPage: 0,
+        publisher: "",
+        authors: o.author.split(/[、,]/),
+        memos: o.annotations.map(annotation => ({
+            memo: annotation.highlight,
+            currentPage: annotation.locationNumber,
+            marker: { locationNumber: annotation.locationNumber }
+        }))
+    };
+    await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+    console.log("Copied!", result);
+})()`;
+
+const OREILLY_CODE = `(async function () {
+    const cards = document.querySelectorAll('article.orm-Card-root');
+    if (!cards.length) { console.error('No highlights found.'); return; }
+    const firstCard = cards[0];
+    const bookTitle = firstCard.querySelector('img')?.alt || 'Unknown Book';
+    const firstLink = firstCard.querySelector('a.orm-Card-link')?.href || '';
+    const bookIdMatch = firstLink.match(/\\/view\\/[^\\/]+\\/([^\\/]+)\\//);
+    const bookId = bookIdMatch ? bookIdMatch[1] : 'unknown';
+    const memos = Array.from(cards).map((card, index) => {
+        const highlightText = card.querySelector('.orm-Card-description')?.textContent?.trim() || '';
+        const chapterLink = card.querySelector('a.orm-Card-link')?.href || '';
+        const chapterTitle = card.querySelector('.orm-Card-title')?.textContent?.trim() || '';
+        const chapterMatch = chapterLink.match(/ch(\\d+)\\.xhtml/) || chapterTitle.match(/(\\d+)/);
+        const chapterNumber = chapterMatch ? parseInt(chapterMatch[1]) : index;
+        return { memo: highlightText, currentPage: chapterNumber, marker: { chapterTitle, url: chapterLink } };
+    }).filter(memo => memo.memo);
+    const result = { fileId: bookId, fileName: bookTitle, title: bookTitle, currentPage: 0, totalPage: 0, publisher: "O'Reilly Media", authors: [], memos };
+    await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+    console.log("Copied!", result);
+})()`;
+
+const CodeBlock = ({ code, label }: { code: string; label: string }) => {
+    const [copied, setCopied] = useState(false);
+    const linkRef = useRef<HTMLAnchorElement>(null);
+
+    useEffect(() => {
+        if (linkRef.current) {
+            linkRef.current.href = `javascript:${encodeURIComponent(code.replace(/\s+/g, " "))}`;
+        }
+    }, [code]);
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const buttonStyle = { lineHeight: "1", padding: "6px 10px", fontSize: "inherit" } as const;
+
+    return (
+        <>
+            <style>{bookmarkletButtonStyle}</style>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                <button onClick={handleCopy} style={buttonStyle}>
+                    {copied ? "Copied!" : "Copy Code"}
+                </button>
+                <span style={{ color: "#666" }}>or</span>
+                <a
+                    ref={linkRef}
+                    className="button bookmarklet-button"
+                    style={{
+                        ...buttonStyle,
+                        backgroundColor: "#666",
+                        borderColor: "#666"
+                    }}
+                    onClick={(e) => e.preventDefault()}
+                    draggable
+                >
+                    {label}
+                </a>
+                <small style={{ color: "#888" }}>← Drag to bookmarks</small>
+            </div>
+        </>
+    );
+};
 
 type ImportBookMemo = {
     fileId: string;
@@ -104,17 +198,11 @@ const ImportPage = () => {
                     </li>
                     <li>インポートしたい本を選択</li>
                     <li>ブラウザの開発者コンソールを開く（F12 または Cmd+Option+I）</li>
-                    <li>
-                        <a
-                            href="https://github.com/azu/mubook-hon/blob/main/app/import/README.md#kindle"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            README
-                        </a>
-                        にあるコードをコンソールに貼り付けて実行
-                    </li>
-                    <li>出力されたJSONをコピーして下のテキストエリアに貼り付け</li>
+                    <li>コードをコピーしてコンソールに貼り付けて実行</li>
+                </ol>
+                <CodeBlock code={KINDLE_CODE} label="Kindle Import" />
+                <ol start={5}>
+                    <li>JSONが自動でコピーされるので、下のテキストエリアに貼り付け</li>
                     <li>「Import」ボタンをクリック</li>
                 </ol>
             </details>
@@ -131,17 +219,11 @@ const ImportPage = () => {
                         を開く
                     </li>
                     <li>ブラウザの開発者コンソールを開く（F12 または Cmd+Option+I）</li>
-                    <li>
-                        <a
-                            href="https://github.com/azu/mubook-hon/blob/main/app/import/README.md#learning-oreilly"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            README
-                        </a>
-                        にあるコードをコンソールに貼り付けて実行
-                    </li>
-                    <li>出力されたJSONをコピーして下のテキストエリアに貼り付け</li>
+                    <li>コードをコピーしてコンソールに貼り付けて実行</li>
+                </ol>
+                <CodeBlock code={OREILLY_CODE} label="O'Reilly Import" />
+                <ol start={4}>
+                    <li>JSONが自動でコピーされるので、下のテキストエリアに貼り付け</li>
                     <li>「Import」ボタンをクリック</li>
                 </ol>
             </details>
