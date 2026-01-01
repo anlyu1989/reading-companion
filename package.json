@@ -10,14 +10,17 @@
     "viewer"
   ],
   "scripts": {
-    "dev": "next dev",
+    "dev": "pnpm run /^dev:/",
+    "dev:next": "next dev",
+    "dev:worker": "wrangler dev",
     "typecheck": "tsc -p .",
     "build": "next build",
+    "deploy": "wrangler deploy",
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,css}\"",
     "prepare": "[ -d .git ] && git config --local core.hooksPath .githooks || echo 'Not a git repository, skipping prepare'",
-    "test": "node --test --require=ts-node/register app/**/*.test.ts __tests__/**/*.test.ts",
+    "test": "node --test --require=ts-node/register app/**/*.test.ts",
     "test:playwright:run": "playwright test",
     "test:playwright:ui": "playwright test --ui",
     "test:playwright:onlyChanged": "playwright test --only-changed",
@@ -47,6 +50,7 @@
     "swr": "^2.3.8"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
     "@playwright/test": "^1.57.0",
     "@types/node": "^20.11.16",
     "@types/react": "^19.0.0",
@@ -57,7 +61,8 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.0.0"
   },
   "msw": {
     "workerDirectory": "public"
@@ -73,5 +78,5 @@
       "prettier --write"
     ]
   },
-  "packageManager": "npm@10.9.2+sha512.8ab88f10f224a0c614cb717a7f7c30499014f77134120e9c1f0211ea3cf3397592cbe483feb38e0c4b3be1c54e347292c76a1b5edb94a3289d5448484ab8ac81"
+  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a"
 }
