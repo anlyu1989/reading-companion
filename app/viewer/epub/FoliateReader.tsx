@@ -283,6 +283,18 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [positionIndicatorVisible, setPositionIndicatorVisible] = useState(false);
     const positionIndicatorTimeoutRef = useRef<number | null>(null);
 
+    // Handle Safari bfcache: reload page when restored from back-forward cache
+    useEffect(() => {
+        const handlePageShow = (e: PageTransitionEvent) => {
+            if (e.persisted) {
+                console.debug("[FoliateReader] Page restored from bfcache, reloading...");
+                window.location.reload();
+            }
+        };
+        window.addEventListener("pageshow", handlePageShow);
+        return () => window.removeEventListener("pageshow", handlePageShow);
+    }, []);
+
     // Initialize foliate-view
     useEffect(() => {
         // Only initialize once when we have src or fileBlob and are in waiting-src state
