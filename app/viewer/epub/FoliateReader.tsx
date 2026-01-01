@@ -266,6 +266,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [isAddingMemo, setIsAddingMemo] = useState(false);
     const [showTOC, setShowTOC] = useState(false);
     const [toc, setToc] = useState<TOCItem[]>([]);
+    // Position indicator visibility (for temporary display on page turn)
+    const [positionIndicatorVisible, setPositionIndicatorVisible] = useState(false);
+    const positionIndicatorTimeoutRef = useRef<number | null>(null);
 
     // Initialize foliate-view
     useEffect(() => {
@@ -354,6 +357,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         document.activeElement.blur();
                     }
                     window.getSelection()?.removeAllRanges();
+
+                    // Show position indicator temporarily on page turn
+                    if (positionIndicatorTimeoutRef.current) {
+                        window.clearTimeout(positionIndicatorTimeoutRef.current);
+                    }
+                    setPositionIndicatorVisible(true);
+                    positionIndicatorTimeoutRef.current = window.setTimeout(() => {
+                        setPositionIndicatorVisible(false);
+                    }, 1000);
                 });
 
                 // Disable paginator's touch handling to prevent conflict with tap navigation
@@ -1181,6 +1193,23 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             />
 
             <ToastComponent onClickJumpLastPage={onClickJumpLastPage} />
+
+            {/* Position indicator - temporary on page turn, always visible when menu is open */}
+            {viewerState.status === "ready" && latestRelocateDetail && (
+                <div
+                    className={`${styles.positionIndicator} ${positionIndicatorVisible || menuState === "open" ? styles.visible : styles.fadeOut}`}
+                >
+                    <span className={styles.current}>
+                        {latestRelocateDetail.location?.current ?? Math.round(latestRelocateDetail.fraction * 100)}
+                    </span>
+                    <span className={styles.delimiter}>/</span>
+                    <span>{latestRelocateDetail.location?.total ?? 100}</span>
+                    <span className={styles.percent}>
+                        (<span className={styles.current}>{Math.round(latestRelocateDetail.fraction * 100)}</span>
+                        <span className={styles.unit}>%</span>)
+                    </span>
+                </div>
+            )}
 
             {/* Upload status indicator */}
             {uploadState.status === "uploading" && <div className={styles.uploadStatus}>Uploading to Notion...</div>}
