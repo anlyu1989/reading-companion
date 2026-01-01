@@ -10,7 +10,6 @@ import {
 } from "../../notion/useNotion";
 import { useNotionFileUpload } from "../../notion/useNotionFileUpload";
 import { useToast } from "../useToast";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
 import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
@@ -23,7 +22,6 @@ export type FoliateReaderProps = {
     fileBlob?: Blob;
     initialPage?: string;
     initialMarker?: string;
-    translation?: boolean;
     onClearCache?: () => Promise<unknown>;
 };
 
@@ -257,11 +255,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     }, [currentBook, isUploadEnabled, props.fileBlob, uploadFile]);
 
     const { showToast, bookInfo, ToastComponent } = useToast();
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
     const [memoStock, setMemoStock] = useState<{ text: string; selectors: { start: string; end: string } }[]>([]);
-    const [isTranslation, setIsTranslation] = useState(props.translation);
     const [canMemoContent, setCanMemoContent] = useState(false);
     const [isAddingMemo, setIsAddingMemo] = useState(false);
     const [showTOC, setShowTOC] = useState(false);
@@ -789,17 +783,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         };
     }, [handleKeydown]);
 
-    const onClickTranslationButton = useCallback(() => {
-        setIsTranslation(!isTranslation);
-        const newParams = new URLSearchParams(searchParams ?? []);
-        if (isTranslation) {
-            newParams.delete("translation");
-        } else {
-            newParams.set("translation", "true");
-        }
-        router.replace(`${pathname}?${newParams.toString()}`);
-    }, [isTranslation, pathname, router, searchParams]);
-
     const getSelectedText = useCallback((): { text: string; selectors: { start: string; end: string } } | null => {
         const view = viewRef.current;
         if (!view) return null;
@@ -1087,14 +1070,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 </button>
                 <button className={styles.menuButton} onClick={() => setShowTOC(!showTOC)} title="Table of Contents">
                     ☰
-                </button>
-                <button
-                    className={styles.menuButton}
-                    style={{ background: isTranslation ? "#ddd" : "#fff" }}
-                    onClick={onClickTranslationButton}
-                    title="Translate Page"
-                >
-                    A
                 </button>
                 {hasCompletedNotionSettings && (
                     <button className={styles.menuButton} onClick={onClickOpenNotionPage} title="Open Notion Page">

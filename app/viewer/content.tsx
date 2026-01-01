@@ -272,7 +272,6 @@ const App = (
                         fileBlob={fileBlob}
                         initialPage={props.initialPage}
                         initialMarker={props.initialMarker}
-                        translation={props.translation}
                         onClearCache={removeCache}
                     />
                 </Suspense>
