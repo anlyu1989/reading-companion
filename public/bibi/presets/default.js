@@ -95,7 +95,7 @@ Bibi.preset({
 
     "website-name-in-title": "mubook-hon", // "" or name of your website replaces string "Bibi" in <title>.
     "website-name-in-menu": "mubook-hon", // "" or name of your website appears in setting-menu as a link. (Requires "website-href")
-    "website-href": "https://mubook-hon.vercel.app/", // "" or URL of your website to be used for the link in setting-menu. (Requires "website-name-in-menu")
+    "website-href": "https://mubook-hon.jser.workers.dev/", // "" or URL of your website to be used for the link in setting-menu. (Requires "website-name-in-menu")
     "remove-bibi-website-link": false, // true or false (if true, the link to Bibi Website is not to be added in setting-menu)
 
     //==============================================================================================================================================
@@ -113,7 +113,7 @@ Bibi.preset({
 
     "prioritise-fallbacks": false, // true or false (If true, Bibi uses <item> at the end of the fallback-chain.
 
-    "trustworthy-origins": ["http://localhost:10002", "http://localhost:3000", "https://mubook-hon.vercel.app"],
+    "trustworthy-origins": ["http://localhost:10002", "http://localhost:3000", "https://mubook-hon.jser.workers.dev"],
 
     // "allow-scripts-in-content": false break some epub render
     // if allow-scripts-in-content is false, Bibi sanitize html content. The extensions/sanitize break some epub content
