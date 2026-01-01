@@ -166,17 +166,13 @@ const HomeContent: FC = () => {
                             ) : recentBooks?.length === 0 ? (
                                 "No recent books"
                             ) : (
-                                <Link
-                                    href={{
-                                        pathname: "/viewer",
-                                        query: {
-                                            id: recentBooks?.at(0)?.fileId,
-                                            viewer: recentBooks?.at(0)?.viewer
-                                        }
-                                    }}
+                                // Use <a> instead of Link to force full page reload
+                                // This prevents foliate-view state corruption from SPA navigation
+                                <a
+                                    href={`/viewer?id=${encodeURIComponent(recentBooks?.at(0)?.fileId ?? "")}&viewer=${encodeURIComponent(recentBooks?.at(0)?.viewer ?? "")}`}
                                 >
                                     📖 {recentBooks?.at(0)?.fileName}
-                                </Link>
+                                </a>
                             )}
                         </summary>
                         <ul>
@@ -184,18 +180,13 @@ const HomeContent: FC = () => {
                                 return (
                                     <li key={item.fileId}>
                                         📖{" "}
-                                        <Link
-                                            href={{
-                                                pathname: "/viewer",
-                                                query: {
-                                                    id: item.fileId,
-                                                    viewer: item.viewer
-                                                }
-                                            }}
-                                            target={userSettings?.openNewTab ? "_blank" : ""}
+                                        <a
+                                            href={`/viewer?id=${encodeURIComponent(item.fileId)}&viewer=${encodeURIComponent(item.viewer)}`}
+                                            target={userSettings?.openNewTab ? "_blank" : undefined}
+                                            rel={userSettings?.openNewTab ? "noopener" : undefined}
                                         >
                                             {item.fileName}
-                                        </Link>
+                                        </a>
                                     </li>
                                 );
                             })}
@@ -236,22 +227,15 @@ const HomeContent: FC = () => {
                             }
                             return (
                                 <li key={item.path_lower}>
-                                    <Link
-                                        href={{
-                                            pathname: "/viewer",
-                                            query: {
-                                                // @ts-ignore
-                                                id: item.id,
-                                                viewer: item.path_lower?.endsWith(".epub")
-                                                    ? "epub:foliate"
-                                                    : "pdf:pdfjs"
-                                            }
-                                        }}
-                                        target={userSettings?.openNewTab ? "_blank" : ""}
-                                        rel="noopener"
+                                    {/* Use <a> instead of Link to force full page reload */}
+                                    {/* This prevents foliate-view state corruption from SPA navigation */}
+                                    <a
+                                        href={`/viewer?id=${encodeURIComponent((item as { id: string }).id)}&viewer=${encodeURIComponent(item.path_lower?.endsWith(".epub") ? "epub:foliate" : "pdf:pdfjs")}`}
+                                        target={userSettings?.openNewTab ? "_blank" : undefined}
+                                        rel={userSettings?.openNewTab ? "noopener" : undefined}
                                     >
                                         {item.path_display}
-                                    </Link>
+                                    </a>
                                 </li>
                             );
                         })}
