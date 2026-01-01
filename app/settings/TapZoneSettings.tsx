@@ -28,7 +28,7 @@ type TapZoneSettingsProps = {
 
 export const TapZoneSettings: FC<TapZoneSettingsProps> = ({ className }) => {
     const { userSettings, updateUserSettings } = useUserSettings();
-    const zones = userSettings?.tapZones?.zones ?? TAP_PRESET_RIGHT_HAND;
+    const zones = userSettings?.tapZones?.zones ?? TAP_PRESET_DEFAULT;
 
     const updateZone = useCallback(
         (row: number, col: number) => {
