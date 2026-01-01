@@ -242,8 +242,17 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     const fileUploadAttemptedRef = useRef(false);
     useEffect(() => {
+        console.debug("[FoliateReader] Upload check:", {
+            isUploadEnabled,
+            hasDataBook: hasDataBook(currentBook),
+            hasFileBlob: !!props.fileBlob,
+            fileBlobSize: props.fileBlob?.size,
+            attempted: fileUploadAttemptedRef.current,
+            pageId
+        });
         if (isUploadEnabled && hasDataBook(currentBook) && props.fileBlob && !fileUploadAttemptedRef.current) {
             fileUploadAttemptedRef.current = true;
+            console.debug("[FoliateReader] Starting file upload...");
             uploadFile(props.fileBlob).then((result) => {
                 if (result.success) {
                     console.debug("File uploaded to Notion successfully");
@@ -252,7 +261,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 }
             });
         }
-    }, [currentBook, isUploadEnabled, props.fileBlob, uploadFile]);
+    }, [currentBook, isUploadEnabled, props.fileBlob, uploadFile, pageId]);
 
     const { showToast, bookInfo, ToastComponent } = useToast();
     const [memoStock, setMemoStock] = useState<{ text: string; selectors: { start: string; end: string } }[]>([]);

@@ -7,12 +7,20 @@ import { DatabaseObjectResponse, PageObjectResponse } from "@notionhq/client/bui
 const USER_DEFINED_NOTION_BASE_URL =
     typeof localStorage !== "undefined" && localStorage.getItem("mubook-hon-NOTION_API_BASE_URL");
 // Cloudflare Workers経由でNotion APIにアクセス
-// 本番: 同一オリジン（/notion/v1/...）、開発: localhost:8787/notion
-const NOTION_API_BASE_URL = USER_DEFINED_NOTION_BASE_URL
-    ? USER_DEFINED_NOTION_BASE_URL
-    : process.env.NODE_ENV === "production"
-      ? "/notion"
-      : "http://localhost:8787/notion";
+// 本番: 同一オリジン（window.location.origin + /notion）、開発: localhost:8787/notion
+// Note: Notion SDKは完全なURLを必要とするため、相対パスではなく絶対URLを使用
+const getNotionApiBaseUrl = () => {
+    if (USER_DEFINED_NOTION_BASE_URL) {
+        return USER_DEFINED_NOTION_BASE_URL;
+    }
+    if (process.env.NODE_ENV === "production") {
+        if (typeof window !== "undefined") {
+            return `${window.location.origin}/notion`;
+        }
+        return "/notion";
+    }
+    return "http://localhost:8787/notion";
+};
 
 export const useNotionList = () => {
     const { notionSetting, hasCompleteNotionSettings: hasCompletedNotionSettings } = useNotionSetting();
@@ -23,7 +31,7 @@ export const useNotionList = () => {
         }
         return new Client({
             auth: apiKey,
-            baseUrl: NOTION_API_BASE_URL,
+            baseUrl: getNotionApiBaseUrl(),
             // SDK v5 requires explicitly bound fetch to avoid "Illegal invocation" error
             fetch: fetch.bind(globalThis)
         });
