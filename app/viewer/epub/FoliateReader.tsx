@@ -54,6 +54,30 @@ type RelocateDetail = {
     pageItem?: { label: string };
 };
 
+type FixedLayoutRenderer = {
+    setStyles?: (css: string) => void;
+    setAttribute: (name: string, value: string) => void;
+    getContents: () => { doc: Document; index: number }[];
+    // Fixed-layout specific methods
+    index: number;
+    book: { sections: unknown[] };
+    getSpreadOf: (section: unknown) => { index: number; side: string } | undefined;
+    goToSpread: (index: number, side: string, reason: string) => Promise<void>;
+    rtl: boolean;
+};
+
+type PaginatorRenderer = {
+    setStyles?: (css: string) => void;
+    setAttribute: (name: string, value: string) => void;
+    getContents: () => { doc: Document; index: number }[];
+    // Paginator specific methods
+    nextSection: () => Promise<void>;
+    prevSection: () => Promise<void>;
+    goTo: (target: { index: number; anchor?: () => number }) => Promise<void>;
+    // Force unlock navigation (added to fix stuck #locked state)
+    forceUnlock: () => void;
+};
+
 type FoliateView = HTMLElement & {
     open: (file: File | Blob | string) => Promise<void>;
     init: (options: { lastLocation?: string; showTextStart?: boolean }) => Promise<void>;
@@ -76,6 +100,7 @@ type FoliateView = HTMLElement & {
         setAttribute: (name: string, value: string) => void;
         getContents: () => { doc: Document; index: number }[];
     };
+    isFixedLayout?: boolean;
     lastLocation?: RelocateDetail;
     getCFI: (index: number, range?: Range) => string;
 };
@@ -120,6 +145,15 @@ const getPublisherString = (publisher: BookMetadata["publisher"]): string => {
     if (!publisher) return "";
     if (typeof publisher === "string") return publisher;
     return getStringFromLanguageMap(publisher.name);
+};
+
+// Navigation helper
+const navigate = async (view: FoliateView, direction: "left" | "right") => {
+    if (direction === "left") {
+        await view.goLeft();
+    } else {
+        await view.goRight();
+    }
 };
 
 const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean }) => `
@@ -308,7 +342,10 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 // Set up event listeners
                 view.addEventListener("relocate", (e: Event) => {
                     const detail = (e as CustomEvent<RelocateDetail>).detail;
-                    console.debug("relocate", detail);
+                    console.debug("[FoliateReader] relocate", {
+                        fraction: detail.fraction,
+                        cfi: detail.cfi?.substring(0, 50)
+                    });
                     setCanMemoContent(true);
                     // Store latest relocate detail for use when updating book status
                     setLatestRelocateDetail(detail);
@@ -319,21 +356,27 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     window.getSelection()?.removeAllRanges();
                 });
 
-                // Disable swipe gestures to prevent conflict with text selection
-                const disableSwipe = (e: TouchEvent) => {
-                    if (e.touches.length > 1) return; // Allow pinch zoom
+                // Disable paginator's touch handling to prevent conflict with tap navigation
+                // This prevents snap() from being called on touchend, which can race with our navigation
+                const disablePaginatorTouch = (e: TouchEvent) => {
+                    if (e.touches && e.touches.length > 1) return; // Allow pinch zoom
                     e.stopImmediatePropagation();
                 };
 
                 view.addEventListener("load", (e: Event) => {
                     const detail = (e as CustomEvent<{ doc: Document; index: number }>).detail;
-                    console.debug("load", detail);
+                    console.debug("[FoliateReader] load event fired", {
+                        index: detail.index,
+                        docTitle: detail.doc?.title
+                    });
 
                     // Add keyboard event listener to the loaded document
                     detail.doc.addEventListener("keydown", handleKeydown);
 
-                    // Disable swipe in each loaded document
-                    detail.doc.addEventListener("touchmove", disableSwipe, { capture: true });
+                    // Disable paginator's touch handling (swipe/snap) - we use tap navigation instead
+                    detail.doc.addEventListener("touchstart", disablePaginatorTouch, { capture: true });
+                    detail.doc.addEventListener("touchmove", disablePaginatorTouch, { capture: true });
+                    detail.doc.addEventListener("touchend", disablePaginatorTouch, { capture: true });
 
                     // Add selection change listener
                     detail.doc.addEventListener("selectionchange", () => {
@@ -350,7 +393,11 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
                     detail.doc.addEventListener("pointerdown", (e: PointerEvent) => {
                         if (!e.isPrimary) return;
-                        pointerStart = { time: Date.now(), x: e.screenX, y: e.screenY };
+                        pointerStart = {
+                            time: Date.now(),
+                            x: e.screenX,
+                            y: e.screenY
+                        };
                     });
 
                     detail.doc.addEventListener("pointerup", (e: PointerEvent) => {
@@ -358,31 +405,58 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         const start = pointerStart;
                         pointerStart = null;
 
+                        console.debug("[FoliateReader] pointerup on doc index:", detail.index, { hasStart: !!start });
+
                         if (!start) return;
 
                         // Check timing - ignore long press (used for selection)
                         const duration = Date.now() - start.time;
-                        if (duration > TAP_THRESHOLD_MS) return;
+                        if (duration > TAP_THRESHOLD_MS) {
+                            console.debug("[FoliateReader] ignored - long press", duration);
+                            return;
+                        }
 
                         // Check movement - ignore drag
                         const dx = Math.abs(e.screenX - start.x);
                         const dy = Math.abs(e.screenY - start.y);
-                        if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) return;
+                        if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) {
+                            console.debug("[FoliateReader] ignored - drag", { dx, dy });
+                            return;
+                        }
 
                         // Ignore if there's a text selection
                         const selection = detail.doc.getSelection();
-                        if (selection && selection.toString().trim()) return;
+                        if (selection && selection.toString().trim()) {
+                            console.debug("[FoliateReader] ignored - has selection");
+                            return;
+                        }
 
-                        // Use screen coordinates and window width for accurate position
-                        // (iframe's clientX is relative to its very wide internal document)
-                        const viewportWidth = window.innerWidth;
+                        // Calculate tap position relative to viewport
+                        const viewportWidth = window.top?.innerWidth ?? window.innerWidth;
                         const navTapWidth = Math.max(60, Math.min(150, viewportWidth * 0.2));
-                        const x = e.screenX - window.screenX;
 
-                        if (x < navTapWidth) {
-                            view.goLeft();
-                        } else if (x > viewportWidth - navTapWidth) {
-                            view.goRight();
+                        // For column-based layouts (pagination), clientX is relative to the full document
+                        // We need to subtract the scroll position to get the position within the visible viewport
+                        const scrollX = detail.doc.documentElement.scrollLeft || detail.doc.body.scrollLeft || 0;
+                        const xInViewport = e.clientX - scrollX;
+
+                        console.debug("[FoliateReader] tap position", {
+                            xInViewport,
+                            navTapWidth,
+                            viewportWidth,
+                            scrollX,
+                            clientX: e.clientX,
+                            screenX: e.screenX
+                        });
+
+                        if (xInViewport < navTapWidth) {
+                            console.debug("[FoliateReader] -> goLeft (tap)");
+                            navigate(view, "left");
+                        } else if (xInViewport > viewportWidth - navTapWidth) {
+                            console.debug("[FoliateReader] -> goRight (tap)");
+                            navigate(view, "right");
+                        } else {
+                            console.debug("[FoliateReader] -> center tap (no action)");
                         }
                     });
 
@@ -472,7 +546,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 });
 
                 // Also add to view itself for redundancy
-                view.addEventListener("touchmove", disableSwipe, { capture: true });
+                view.addEventListener("touchstart", disablePaginatorTouch, { capture: true });
+                view.addEventListener("touchmove", disablePaginatorTouch, { capture: true });
+                view.addEventListener("touchend", disablePaginatorTouch, { capture: true });
 
                 isInitialized.current = true;
                 restoreConsole();
@@ -684,9 +760,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 // Save memo
                 onClickMemo();
             } else if (event.key === "j" || event.key === "ArrowRight") {
-                view.goRight();
+                navigate(view, "right");
             } else if (event.key === "k" || event.key === "ArrowLeft") {
-                view.goLeft();
+                navigate(view, "left");
             }
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
