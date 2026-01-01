@@ -197,17 +197,14 @@
 /* Position Indicator - temporary display on page turn (inspired by Bibi's bibi-nombre) */
 .positionIndicator {
     position: fixed;
-    bottom: 2px;
+    bottom: calc(2px + env(safe-area-inset-bottom, 0));
     left: -100%;
     right: -100%;
     margin: auto;
     width: fit-content;
-    height: 18px;
-    line-height: 18px;
     background: rgba(0, 0, 0, 0.4);
     color: rgba(255, 255, 255, 0.9);
-    padding: 0 10px;
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding: 4px 10px;
     border-radius: 9px;
     font-size: 10px;
     text-align: center;
