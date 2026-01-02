@@ -18,10 +18,16 @@ const formatMarkerPosition = (marker: BookMarker | undefined): string | number =
     return "";
 };
 
+type NotifyMessage = { title: string; type: "success" | "error" };
+
 export const useToast = () => {
     const [open, setOpen] = useState(false);
     const timerRef = useRef(0);
     const [restoreMakers, setRestoreMakers] = useState<{ current: BookMarker; lastRead: BookMarker }>();
+    // Generic notification
+    const [notifyOpen, setNotifyOpen] = useState(false);
+    const [notifyMessage, setNotifyMessage] = useState<NotifyMessage | null>(null);
+    const notifyTimerRef = useRef(0);
     const currentMarker = restoreMakers?.current;
     const lastReadMarker = restoreMakers?.lastRead;
     const current = useMemo(() => formatMarkerPosition(currentMarker), [currentMarker]);
@@ -41,6 +47,14 @@ export const useToast = () => {
         setOpen(false);
         clearTimeout(timerRef.current);
     }, []);
+    const notify = useCallback((message: NotifyMessage) => {
+        setNotifyMessage(message);
+        setNotifyOpen(true);
+        clearTimeout(notifyTimerRef.current);
+        notifyTimerRef.current = window.setTimeout(() => {
+            setNotifyOpen(false);
+        }, 3000);
+    }, []);
     const ToastComponent: FC<{ onClickJumpLastPage: () => void }> = (props) => {
         return (
             <Toast.Provider swipeDirection="right">
@@ -59,6 +73,21 @@ export const useToast = () => {
                         </button>
                     </Toast.Action>
                 </Toast.Root>
+                {notifyMessage && (
+                    <Toast.Root
+                        className="ToastRoot"
+                        open={notifyOpen}
+                        onOpenChange={setNotifyOpen}
+                        style={{
+                            background:
+                                notifyMessage.type === "success" ? "rgba(0, 128, 0, 0.9)" : "rgba(200, 0, 0, 0.9)"
+                        }}
+                    >
+                        <Toast.Title className="ToastTitle" style={{ color: "white" }}>
+                            {notifyMessage.title}
+                        </Toast.Title>
+                    </Toast.Root>
+                )}
                 <Toast.Viewport className="ToastViewport" />
             </Toast.Provider>
         );
@@ -69,6 +98,7 @@ export const useToast = () => {
         bookInfo: restoreMakers,
         showToast: show,
         hideToast: hide,
+        notify,
         ToastComponent
     } as const;
 };

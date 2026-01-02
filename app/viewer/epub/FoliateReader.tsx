@@ -14,6 +14,7 @@ import { useToast } from "../useToast";
 import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
 import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
+import { extractFullText } from "./extractFullText";
 import styles from "./FoliateReader.module.css";
 
 export type FoliateReaderProps = {
@@ -92,7 +93,11 @@ type FoliateView = HTMLElement & {
         toc?: TOCItem[];
         dir?: "ltr" | "rtl";
         getCover?: () => Promise<Blob | null>;
-        sections?: { id: string; linear?: string }[];
+        sections?: {
+            id: string;
+            linear?: string;
+            createDocument: () => Promise<Document>;
+        }[];
     };
     renderer: {
         setStyles?: (css: string) => void;
@@ -245,35 +250,87 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     // File upload
     const pageId = hasDataBook(currentBook) ? currentBook.pageId : undefined;
-    const { uploadFile, uploadState, isUploadEnabled } = useNotionFileUpload({
+    const { uploadFile, uploadTextFile, isUploadEnabled } = useNotionFileUpload({
         pageId,
         fileName: props.bookFileName
     });
 
-    const fileUploadAttemptedRef = useRef(false);
-    useEffect(() => {
-        console.debug("[FoliateReader] Upload check:", {
-            isUploadEnabled,
-            hasDataBook: hasDataBook(currentBook),
-            hasFileBlob: !!props.fileBlob,
-            fileBlobSize: props.fileBlob?.size,
-            attempted: fileUploadAttemptedRef.current,
-            pageId
-        });
-        if (isUploadEnabled && hasDataBook(currentBook) && props.fileBlob && !fileUploadAttemptedRef.current) {
-            fileUploadAttemptedRef.current = true;
-            console.debug("[FoliateReader] Starting file upload...");
-            uploadFile(props.fileBlob).then((result) => {
-                if (result.success) {
-                    console.debug("File uploaded to Notion successfully");
-                } else {
-                    console.debug("File upload skipped or failed:", result.error);
-                }
-            });
-        }
-    }, [currentBook, isUploadEnabled, props.fileBlob, uploadFile, pageId]);
+    const { showToast, bookInfo, notify, ToastComponent } = useToast();
 
-    const { showToast, bookInfo, ToastComponent } = useToast();
+    // File uploads (EPUB and TXT)
+    const [isUploading, setIsUploading] = useState(false);
+    const uploadAttemptedRef = useRef<{ epub: boolean; text: boolean }>({ epub: false, text: false });
+
+    useEffect(() => {
+        if (!isUploadEnabled || !hasDataBook(currentBook)) {
+            return;
+        }
+
+        const sections = viewRef.current?.book?.sections;
+        const shouldUploadEpub = props.fileBlob && !uploadAttemptedRef.current.epub;
+        const shouldUploadText = sections && !uploadAttemptedRef.current.text;
+
+        if (!shouldUploadEpub && !shouldUploadText) {
+            return;
+        }
+
+        const uploads: Promise<{ type: string; success: boolean }>[] = [];
+
+        // EPUB upload
+        if (shouldUploadEpub) {
+            uploadAttemptedRef.current.epub = true;
+            uploads.push(
+                uploadFile(props.fileBlob!).then((result) => {
+                    console.debug("EPUB upload result:", result.success ? "success" : result.error);
+                    return { type: "epub", success: result.success };
+                })
+            );
+        }
+
+        // Text extraction and upload
+        if (shouldUploadText) {
+            uploadAttemptedRef.current.text = true;
+            uploads.push(
+                extractFullText(sections!)
+                    .then((fullText) => {
+                        if (!fullText || fullText.length < 100) {
+                            console.debug("Text too short, skipping upload");
+                            return { type: "text", success: false };
+                        }
+                        console.debug(`Extracted ${fullText.length} chars, uploading...`);
+                        return uploadTextFile(fullText).then((result) => ({
+                            type: "text",
+                            success: result.success
+                        }));
+                    })
+                    .catch((error) => {
+                        console.error("Text extraction failed:", error);
+                        return { type: "text", success: false };
+                    })
+            );
+        }
+
+        if (uploads.length === 0) return;
+
+        setIsUploading(true);
+        console.debug(`[FoliateReader] Starting ${uploads.length} upload(s)...`);
+
+        Promise.all(uploads)
+            .then((results) => {
+                console.debug("Upload results:", results);
+                const successCount = results.filter((r) => r.success).length;
+                if (successCount > 0) {
+                    notify({ title: `Uploaded ${successCount} file(s)`, type: "success" });
+                }
+            })
+            .catch((error) => {
+                console.error("Upload failed:", error);
+                notify({ title: "Upload failed", type: "error" });
+            })
+            .finally(() => {
+                setIsUploading(false);
+            });
+    }, [currentBook, isUploadEnabled, notify, props.fileBlob, uploadFile, uploadTextFile]);
     const [memoStock, setMemoStock] = useState<{ text: string; selectors: { start: string; end: string } }[]>([]);
     const [canMemoContent, setCanMemoContent] = useState(false);
     const [isAddingMemo, setIsAddingMemo] = useState(false);
@@ -1218,21 +1275,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             )}
 
             {/* Upload status indicator */}
-            {uploadState.status === "uploading" && <div className={styles.uploadStatus}>Uploading to Notion...</div>}
-            {uploadState.status === "success" && (
-                <div className={styles.uploadStatus} style={{ background: "rgba(0, 128, 0, 0.8)" }}>
-                    Uploaded
-                </div>
-            )}
-            {uploadState.status === "error" && (
-                <div
-                    className={styles.uploadStatus}
-                    style={{ background: "rgba(200, 0, 0, 0.8)" }}
-                    title={uploadState.error}
-                >
-                    Upload failed
-                </div>
-            )}
+            {isUploading && <div className={styles.uploadStatus}>Uploading to Notion...</div>}
         </div>
     );
 };

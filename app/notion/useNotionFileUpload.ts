@@ -59,6 +59,10 @@ const getNotionApiBaseUrl = () => {
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// テキストファイルのサイズ制限（Notion APIの制限に合わせる）
+const MAX_TEXT_SIZE_MB = 5;
+const MAX_TEXT_SIZE_BYTES = MAX_TEXT_SIZE_MB * 1024 * 1024;
+
 // Notion File Upload APIがサポートしていない形式の変換マップ
 // Note: EPUBなどはapplication/msword + .doc拡張子で送信（ブラウザがダウンロードする形式）
 const UNSUPPORTED_EXTENSIONS: Record<string, { contentType: string; addExtension: string }> = {
@@ -287,8 +291,114 @@ export const useNotionFileUpload = ({ pageId, fileName }: { pageId?: string; fil
         }
     }, [uploadState.status]);
 
+    /**
+     * テキストファイルをNotionにアップロードしてページのTxtFileプロパティに設定
+     */
+    const uploadTextFile = useCallback(
+        async (textContent: string): Promise<{ success: boolean; error?: string }> => {
+            if (!notionClient || !pageId || !fileName || !apiKey) {
+                return { success: false, error: "Not initialized" };
+            }
+
+            if (!userSettings?.uploadBookToNotion) {
+                return { success: false, error: "Upload setting is disabled" };
+            }
+
+            // WiFi接続チェック
+            if (!isWifiConnection()) {
+                return { success: false, error: "Not on WiFi connection" };
+            }
+
+            // テキストサイズチェック
+            const textBlob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+            if (textBlob.size > MAX_TEXT_SIZE_BYTES) {
+                return {
+                    success: false,
+                    error: `Text size ${(textBlob.size / 1024 / 1024).toFixed(2)}MB exceeds ${MAX_TEXT_SIZE_MB}MB limit`
+                };
+            }
+
+            // 既存のTxtFileプロパティを確認
+            try {
+                const page = (await notionClient.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
+                const txtFileProperty = page.properties.TxtFile as FilePropertyValue | undefined;
+
+                if (txtFileProperty && txtFileProperty.files && txtFileProperty.files.length > 0) {
+                    console.debug("TxtFile already exists, skipping upload");
+                    return { success: false, error: "TxtFile already exists in Notion" };
+                }
+            } catch (error) {
+                console.warn("Failed to check existing TxtFile property", error);
+                return { success: false, error: "Failed to check existing TxtFile" };
+            }
+
+            try {
+                const txtFileName = fileName.replace(/\.[^.]+$/, ".txt");
+
+                // 1. File Upload オブジェクトを作成
+                const createResponse = await notionClient.request<FileUploadResponse>({
+                    path: "file_uploads",
+                    method: "post",
+                    body: {
+                        filename: txtFileName,
+                        content_type: "text/plain"
+                    }
+                });
+
+                console.debug("Created text file upload:", createResponse);
+
+                // 2. ファイルを送信
+                const formData = new FormData();
+                formData.append("file", textBlob, txtFileName);
+
+                const sendResponse = await fetch(`${getNotionApiBaseUrl()}/v1/file_uploads/${createResponse.id}/send`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        "Notion-Version": "2022-06-28"
+                    },
+                    body: formData
+                });
+
+                if (!sendResponse.ok) {
+                    const errorText = await sendResponse.text();
+                    throw new Error(`Failed to send text file: ${sendResponse.status} ${errorText}`);
+                }
+
+                const sendResult: SendFileResponse = await sendResponse.json();
+                console.debug("Sent text file:", sendResult);
+
+                // 3. ページのTxtFileプロパティを更新
+                await notionClient.pages.update({
+                    page_id: pageId,
+                    properties: {
+                        TxtFile: {
+                            // @ts-ignore - Notion SDK types might not include file_upload yet
+                            files: [
+                                {
+                                    type: "file_upload",
+                                    file_upload: { id: createResponse.id },
+                                    name: txtFileName
+                                }
+                            ]
+                        }
+                    }
+                });
+
+                console.debug("Text file uploaded and attached to page:", pageId);
+                return { success: true };
+            } catch (error) {
+                console.error("Failed to upload text file to Notion:", error);
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                return { success: false, error: errorMessage };
+            }
+        },
+        [apiKey, fileName, notionClient, pageId, userSettings?.uploadBookToNotion]
+    );
+
     return {
         uploadFile,
+        uploadTextFile,
         checkShouldUpload,
         uploadState,
         isUploadEnabled: userSettings?.uploadBookToNotion ?? false
