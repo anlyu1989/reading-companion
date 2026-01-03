@@ -1,0 +1,4 @@
+- Next.js/Cloudflare Workersでホスティング
+- ProxyはNotionのCORS対応のために使用
+- epubはFoliateReader
+- bibi版はメンテナンスしていないので、指定されてない場合は調査しない
