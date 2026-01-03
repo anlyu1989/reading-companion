@@ -13,6 +13,7 @@ import { useUserSettings, TapAction, TAP_PRESET_DEFAULT } from "../../settings/u
 import { useToast } from "../useToast";
 import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
+import { addToMemoStock, MemoStockItem } from "../../utils/addToMemoStock";
 import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
 import { extractFullText } from "./extractFullText";
 import styles from "./FoliateReader.module.css";
@@ -331,7 +332,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 setIsUploading(false);
             });
     }, [currentBook, isUploadEnabled, notify, props.fileBlob, uploadFile, uploadTextFile]);
-    const [memoStock, setMemoStock] = useState<{ text: string; selectors: { start: string; end: string } }[]>([]);
+    const [memoStock, setMemoStock] = useState<MemoStockItem[]>([]);
     const [canMemoContent, setCanMemoContent] = useState(false);
     const [isAddingMemo, setIsAddingMemo] = useState(false);
     const [showTOC, setShowTOC] = useState(false);
@@ -484,9 +485,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     const TAP_THRESHOLD_MS = 300;
                     const MOVE_THRESHOLD_PX = 10;
                     let pointerStart: { time: number; x: number; y: number } | null = null;
+                    let hadSelectionOnPointerDown = false;
 
                     detail.doc.addEventListener("pointerdown", (e: PointerEvent) => {
                         if (!e.isPrimary) return;
+                        // Record if there was a selection at pointerdown time
+                        // This is needed because on touch devices, the selection may not be
+                        // finalized yet at pointerup time when completing a selection gesture
+                        const selection = detail.doc.getSelection();
+                        hadSelectionOnPointerDown = !!(selection && selection.toString().trim());
                         pointerStart = {
                             time: Date.now(),
                             x: e.screenX,
@@ -518,7 +525,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                             return;
                         }
 
-                        // Ignore if there's a text selection
+                        // Ignore if there was a selection at pointerdown time
+                        // This catches selection gestures where the selection may not be
+                        // finalized yet at pointerup time
+                        if (hadSelectionOnPointerDown) {
+                            console.debug("[FoliateReader] ignored - had selection on pointerdown");
+                            return;
+                        }
+
+                        // Ignore if there's a text selection at pointerup time
                         const selection = detail.doc.getSelection();
                         if (selection && selection.toString().trim()) {
                             console.debug("[FoliateReader] ignored - has selection");
@@ -932,9 +947,10 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     const onClickStockMemo = useCallback(() => {
         const selected = getSelectedText() ?? getCurrentPageText();
-        if (!selected?.text) return;
-
-        setMemoStock((prev) => [...prev, selected]);
+        if (!selected?.text) {
+            return;
+        }
+        setMemoStock((prev) => addToMemoStock(prev, selected));
     }, [getSelectedText, getCurrentPageText]);
 
     const onClickMemo = useCallback(async () => {
