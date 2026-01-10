@@ -486,6 +486,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     const MOVE_THRESHOLD_PX = 10;
                     let pointerStart: { time: number; x: number; y: number } | null = null;
                     let hadSelectionOnPointerDown = false;
+                    let hadPointerMove = false;
 
                     detail.doc.addEventListener("pointerdown", (e: PointerEvent) => {
                         if (!e.isPrimary) return;
@@ -494,6 +495,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         // finalized yet at pointerup time when completing a selection gesture
                         const selection = detail.doc.getSelection();
                         hadSelectionOnPointerDown = !!(selection && selection.toString().trim());
+                        hadPointerMove = false;
                         pointerStart = {
                             time: Date.now(),
                             x: e.screenX,
@@ -501,12 +503,38 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         };
                     });
 
+                    detail.doc.addEventListener("pointermove", (e: PointerEvent) => {
+                        if (!e.isPrimary) return;
+                        // Track significant movement during touch/pointer interaction
+                        // This helps detect selection gestures on iOS where selection
+                        // may not be finalized at pointerup time
+                        // Use threshold (8px) to filter out finger jitter during tap
+                        if (pointerStart && !hadPointerMove) {
+                            const moveDx = Math.abs(e.screenX - pointerStart.x);
+                            const moveDy = Math.abs(e.screenY - pointerStart.y);
+                            if (moveDx > 8 || moveDy > 8) {
+                                hadPointerMove = true;
+                            }
+                        }
+                    });
+
                     detail.doc.addEventListener("pointerup", (e: PointerEvent) => {
                         if (!e.isPrimary) return;
                         const start = pointerStart;
+                        const wasPointerMove = hadPointerMove;
                         pointerStart = null;
 
-                        console.debug("[FoliateReader] pointerup on doc index:", detail.index, { hasStart: !!start });
+                        const selection = detail.doc.getSelection();
+                        const selectionText = selection?.toString().trim() || "";
+                        console.debug("[FoliateReader] pointerup on doc index:", detail.index, {
+                            hasStart: !!start,
+                            hadPointerMove: wasPointerMove,
+                            hadSelectionOnPointerDown,
+                            hasSelectionNow: !!selectionText,
+                            pointerType: e.pointerType,
+                            startPos: start ? { x: start.x, y: start.y } : null,
+                            endPos: { x: e.screenX, y: e.screenY }
+                        });
 
                         if (!start) return;
 
@@ -537,6 +565,14 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         const selection = detail.doc.getSelection();
                         if (selection && selection.toString().trim()) {
                             console.debug("[FoliateReader] ignored - has selection");
+                            return;
+                        }
+
+                        // For touch devices, ignore if there was any pointer movement
+                        // On iOS, selection may not be finalized at pointerup time,
+                        // so we use movement as a signal that this was a selection gesture
+                        if (e.pointerType === "touch" && hadPointerMove) {
+                            console.debug("[FoliateReader] ignored - touch with move (possible selection gesture)");
                             return;
                         }
 
