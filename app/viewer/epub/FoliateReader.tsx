@@ -162,12 +162,20 @@ const navigate = async (view: FoliateView, direction: "next" | "prev") => {
     }
 };
 
-const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean }) => `
+// Base font size in pixels (100% = 16px, browser default)
+// This ensures consistent font sizing across all books
+const BASE_FONT_SIZE_PX = 16;
+
+const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean; fontSize: number }) => `
     @namespace epub "http://www.idpf.org/2007/ops";
     html {
         color-scheme: light only;
         background: white;
         color: black;
+        font-size: ${BASE_FONT_SIZE_PX * (options.fontSize / 100)}px !important;
+    }
+    body {
+        font-size: 1rem !important;
     }
     p, li, blockquote, dd {
         line-height: ${options.spacing};
@@ -681,12 +689,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     throw openError;
                 }
 
-                // Set styles
+                // Set styles (fontSize: 100 = 16px base)
                 view.renderer.setStyles?.(
                     getCSS({
                         spacing: 1.4,
                         justify: true,
-                        hyphenate: true
+                        hyphenate: true,
+                        fontSize: 100
                     })
                 );
 
@@ -1075,8 +1084,9 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             getCSS({
                 spacing: 1.4,
                 justify: true,
-                hyphenate: true
-            }) + `\nhtml { font-size: ${size}% !important; }`
+                hyphenate: true,
+                fontSize: size
+            })
         );
     }, []);
 
