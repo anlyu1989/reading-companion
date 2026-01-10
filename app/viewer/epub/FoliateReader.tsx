@@ -562,8 +562,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         }
 
                         // Ignore if there's a text selection at pointerup time
-                        const selection = detail.doc.getSelection();
-                        if (selection && selection.toString().trim()) {
+                        if (selectionText) {
                             console.debug("[FoliateReader] ignored - has selection");
                             return;
                         }
