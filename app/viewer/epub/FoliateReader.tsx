@@ -177,6 +177,10 @@ const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean
     body {
         font-size: 1rem !important;
     }
+    /* Force text elements to inherit font-size from html/body (excludes headings) */
+    p, span, div, li, blockquote, dd, a, em, strong, b, i {
+        font-size: inherit !important;
+    }
     p, li, blockquote, dd {
         line-height: ${options.spacing};
         text-align: ${options.justify ? "justify" : "start"};
