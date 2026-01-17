@@ -472,6 +472,20 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         docTitle: detail.doc?.title
                     });
 
+                    // Apply styles after fonts are ready
+                    // At this point, paginator's internal view is properly set
+                    detail.doc.fonts.ready.then(() => {
+                        console.debug("[FoliateReader] fonts ready, applying styles");
+                        viewRef.current?.renderer?.setStyles?.(
+                            getCSS({
+                                spacing: 1.4,
+                                justify: true,
+                                hyphenate: true,
+                                fontSize: 100
+                            })
+                        );
+                    });
+
                     // Add keyboard event listener to the loaded document
                     detail.doc.addEventListener("keydown", handleKeydown);
 
