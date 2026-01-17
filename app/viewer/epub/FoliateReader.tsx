@@ -228,8 +228,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [fontSize, setFontSize] = useState(100); // percentage
     const viewRef = useRef<FoliateView | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    // Store current styles for reapplication on section load
-    const currentStylesRef = useRef<string | null>(null);
     const isInitialized = useRef(false);
     // Prevent duplicate book creation when multiple relocate events fire before first creation completes
     const isBookCreatingRef = useRef(false);
@@ -474,18 +472,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         docTitle: detail.doc?.title
                     });
 
-                    // Insert styles directly into iframe's document
-                    // This bypasses foliate-js's setStyles() timing issues
-                    if (currentStylesRef.current && detail.doc?.head) {
-                        const existingStyle = detail.doc.getElementById("mubook-custom-styles");
-                        if (existingStyle) existingStyle.remove();
-
-                        const styleEl = detail.doc.createElement("style");
-                        styleEl.id = "mubook-custom-styles";
-                        styleEl.textContent = currentStylesRef.current;
-                        detail.doc.head.appendChild(styleEl);
-                    }
-
                     // Add keyboard event listener to the loaded document
                     detail.doc.addEventListener("keydown", handleKeydown);
 
@@ -702,14 +688,14 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                 }
 
                 // Set styles (fontSize: 100 = 16px base)
-                const initialCSS = getCSS({
-                    spacing: 1.4,
-                    justify: true,
-                    hyphenate: true,
-                    fontSize: 100
-                });
-                currentStylesRef.current = initialCSS;
-                view.renderer.setStyles?.(initialCSS);
+                view.renderer.setStyles?.(
+                    getCSS({
+                        spacing: 1.4,
+                        justify: true,
+                        hyphenate: true,
+                        fontSize: 100
+                    })
+                );
 
                 // Set TOC
                 if (view.book?.toc) {
@@ -1101,26 +1087,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     const applyFontSize = useCallback((size: number) => {
         const view = viewRef.current;
-        if (!view?.renderer) return;
-        const css = getCSS({
-            spacing: 1.4,
-            justify: true,
-            hyphenate: true,
-            fontSize: size
-        });
-        currentStylesRef.current = css;
-        view.renderer.setStyles?.(css);
-
-        // Update styles directly in all iframe documents
-        const contents = view.renderer.getContents?.();
-        if (contents) {
-            for (const { doc } of contents) {
-                const styleEl = doc.getElementById("mubook-custom-styles");
-                if (styleEl) {
-                    styleEl.textContent = css;
-                }
-            }
-        }
+        if (!view?.renderer?.setStyles) return;
+        view.renderer.setStyles(
+            getCSS({
+                spacing: 1.4,
+                justify: true,
+                hyphenate: true,
+                fontSize: size
+            })
+        );
     }, []);
 
     const increaseFontSize = useCallback(() => {
