@@ -51,11 +51,11 @@ const HomeContent: FC = () => {
     const lastRead = useLastRead();
     const [isAutoNavigating, setIsAutoNavigating] = useState(false);
 
-    // bfcacheから復元された場合に状態をリセット
+    // bfcacheから復元された場合はリロード
     useEffect(() => {
         const handlePageShow = (e: PageTransitionEvent) => {
             if (e.persisted) {
-                setIsAutoNavigating(false);
+                window.location.reload();
             }
         };
         window.addEventListener("pageshow", handlePageShow);
