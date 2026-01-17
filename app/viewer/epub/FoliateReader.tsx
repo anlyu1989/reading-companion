@@ -467,15 +467,25 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
                 view.addEventListener("load", (e: Event) => {
                     const detail = (e as CustomEvent<{ doc: Document; index: number }>).detail;
+                    const loadTime = Date.now();
                     console.debug("[FoliateReader] load event fired", {
                         index: detail.index,
-                        docTitle: detail.doc?.title
+                        docTitle: detail.doc?.title,
+                        isPWA: isPWAStandaloneMode(),
+                        loadTime
                     });
 
                     // Apply styles after fonts are ready
                     // At this point, paginator's internal view is properly set
                     detail.doc.fonts.ready.then(() => {
-                        console.debug("[FoliateReader] fonts ready, applying styles");
+                        const fontsReadyTime = Date.now();
+                        console.debug("[FoliateReader] fonts ready, applying styles", {
+                            isPWA: isPWAStandaloneMode(),
+                            fontsReadyTime,
+                            delay: fontsReadyTime - loadTime,
+                            hasRenderer: !!viewRef.current?.renderer,
+                            hasSetStyles: !!viewRef.current?.renderer?.setStyles
+                        });
                         viewRef.current?.renderer?.setStyles?.(
                             getCSS({
                                 spacing: 1.4,
