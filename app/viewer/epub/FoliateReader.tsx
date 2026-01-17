@@ -474,15 +474,16 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         docTitle: detail.doc?.title
                     });
 
-                    // Reapply styles after a short delay to ensure paginator's internal
-                    // view is properly set. Using setTimeout because at the time of load event,
-                    // paginator's this.#view may not yet point to the new view.
-                    if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
-                        setTimeout(() => {
-                            if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
-                                viewRef.current.renderer.setStyles(currentStylesRef.current);
-                            }
-                        }, 0);
+                    // Insert styles directly into iframe's document
+                    // This bypasses foliate-js's setStyles() timing issues
+                    if (currentStylesRef.current && detail.doc?.head) {
+                        const existingStyle = detail.doc.getElementById("mubook-custom-styles");
+                        if (existingStyle) existingStyle.remove();
+
+                        const styleEl = detail.doc.createElement("style");
+                        styleEl.id = "mubook-custom-styles";
+                        styleEl.textContent = currentStylesRef.current;
+                        detail.doc.head.appendChild(styleEl);
                     }
 
                     // Add keyboard event listener to the loaded document
@@ -1100,7 +1101,7 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
     const applyFontSize = useCallback((size: number) => {
         const view = viewRef.current;
-        if (!view?.renderer?.setStyles) return;
+        if (!view?.renderer) return;
         const css = getCSS({
             spacing: 1.4,
             justify: true,
@@ -1108,7 +1109,18 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             fontSize: size
         });
         currentStylesRef.current = css;
-        view.renderer.setStyles(css);
+        view.renderer.setStyles?.(css);
+
+        // Update styles directly in all iframe documents
+        const contents = view.renderer.getContents?.();
+        if (contents) {
+            for (const { doc } of contents) {
+                const styleEl = doc.getElementById("mubook-custom-styles");
+                if (styleEl) {
+                    styleEl.textContent = css;
+                }
+            }
+        }
     }, []);
 
     const increaseFontSize = useCallback(() => {
