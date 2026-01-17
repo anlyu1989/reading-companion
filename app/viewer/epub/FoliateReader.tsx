@@ -487,16 +487,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                                 fontSize: 100
                             })
                         );
-                        setTimeout(() => {
-                            viewRef.current?.renderer?.setStyles?.(
-                                getCSS({
-                                    spacing: 1.4,
-                                    justify: true,
-                                    hyphenate: true,
-                                    fontSize: 100
-                                })
-                            );
-                        }, 1000); // Re-apply after 1s to catch late-loading fonts
                     });
 
                     // Add keyboard event listener to the loaded document
