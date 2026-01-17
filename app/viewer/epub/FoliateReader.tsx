@@ -441,6 +441,14 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         fraction: detail.fraction,
                         cfi: detail.cfi?.substring(0, 50)
                     });
+
+                    // Reapply styles on relocate to ensure consistent font sizing
+                    // This is done here (after navigation completes) because paginator's
+                    // internal #view is properly set at this point
+                    if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
+                        viewRef.current.renderer.setStyles(currentStylesRef.current);
+                    }
+
                     setCanMemoContent(true);
                     // Store latest relocate detail for use when updating book status
                     setLatestRelocateDetail(detail);
