@@ -498,12 +498,19 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     detail.doc.addEventListener("touchend", disablePaginatorTouch, { capture: true });
 
                     // Add selection change listener
-                    detail.doc.addEventListener("selectionchange", () => {
-                        const selection = detail.doc.getSelection();
-                        if (selection && selection.toString().trim()) {
-                            setCanMemoContent(true);
-                        }
-                    });
+                    // Also stops propagation to prevent paginator's checkPointerSelection from triggering next()/prev()
+                    detail.doc.addEventListener(
+                        "selectionchange",
+                        (e) => {
+                            const selection = detail.doc.getSelection();
+                            if (selection && selection.toString().trim()) {
+                                setCanMemoContent(true);
+                            }
+                            // Stop paginator's selection-based page navigation
+                            e.stopImmediatePropagation();
+                        },
+                        { capture: true }
+                    );
 
                     // Add pointer event handlers for navigation on iframe content
                     const TAP_THRESHOLD_MS = 300;
