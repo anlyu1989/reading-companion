@@ -441,14 +441,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         fraction: detail.fraction,
                         cfi: detail.cfi?.substring(0, 50)
                     });
-
-                    // Reapply styles on relocate to ensure consistent font sizing
-                    // This is done here (after navigation completes) because paginator's
-                    // internal #view is properly set at this point
-                    if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
-                        viewRef.current.renderer.setStyles(currentStylesRef.current);
-                    }
-
                     setCanMemoContent(true);
                     // Store latest relocate detail for use when updating book status
                     setLatestRelocateDetail(detail);
@@ -482,9 +474,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         docTitle: detail.doc?.title
                     });
 
-                    // Reapply styles to ensure consistent font sizing across all sections
+                    // Reapply styles after a short delay to ensure paginator's internal
+                    // view is properly set. Using setTimeout because at the time of load event,
+                    // paginator's this.#view may not yet point to the new view.
                     if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
-                        viewRef.current.renderer.setStyles(currentStylesRef.current);
+                        setTimeout(() => {
+                            if (currentStylesRef.current && viewRef.current?.renderer?.setStyles) {
+                                viewRef.current.renderer.setStyles(currentStylesRef.current);
+                            }
+                        }, 0);
                     }
 
                     // Add keyboard event listener to the loaded document
