@@ -51,6 +51,17 @@ const HomeContent: FC = () => {
     const lastRead = useLastRead();
     const [isAutoNavigating, setIsAutoNavigating] = useState(false);
 
+    // bfcacheから復元された場合に状態をリセット
+    useEffect(() => {
+        const handlePageShow = (e: PageTransitionEvent) => {
+            if (e.persisted) {
+                setIsAutoNavigating(false);
+            }
+        };
+        window.addEventListener("pageshow", handlePageShow);
+        return () => window.removeEventListener("pageshow", handlePageShow);
+    }, []);
+
     // PWA起動時の自動遷移
     useEffect(() => {
         if (!isFreshLaunch || !lastRead) {
