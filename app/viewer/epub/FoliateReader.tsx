@@ -175,18 +175,11 @@ const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean
         color-scheme: light only;
         background: white;
         color: black;
-        /* Define normalized font size as CSS variable for consistent sizing across all chapters */
-        --normalized-font-size: ${BASE_FONT_SIZE_PX * (options.fontSize / 100)}px;
-        font-size: var(--normalized-font-size) !important;
+        /* Set base font size. EPUB's relative sizes (em, rem, %) will scale from this base. */
+        font-size: ${BASE_FONT_SIZE_PX * (options.fontSize / 100)}px !important;
     }
     body {
-        font-size: var(--normalized-font-size) !important;
-    }
-    /* Force text elements to use normalized font-size directly (not inherit from parent).
-       Using var() instead of inherit ensures consistent sizing even when parent elements
-       (section, article, etc.) have different font-sizes defined in the EPUB's original CSS. */
-    p, span, div, li, blockquote, dd, a, em, strong, b, i {
-        font-size: var(--normalized-font-size) !important;
+        font-size: inherit;
     }
     p, li, blockquote, dd {
         line-height: ${options.spacing};
