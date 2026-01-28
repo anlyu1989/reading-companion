@@ -68,6 +68,8 @@ export type StorageSchema = {
     "mubook-hon-user-settings": UserSettings;
     /** 最後に読んだ書籍情報（PWA自動遷移用） */
     "mubook-hon-last-read": LastReadInfo;
+    /** EPUBビューアーのフォントサイズ（書籍IDごとのパーセンテージ） */
+    "mubook-hon-epub-font-sizes": Record<string, number>;
 };
 
 // ========================================
@@ -92,7 +94,8 @@ const STORAGE_KEYS: (keyof StorageSchema)[] = [
     "mubook-hon-notion",
     "mubook-hon-NOTION_API_BASE_URL",
     "mubook-hon-user-settings",
-    "mubook-hon-last-read"
+    "mubook-hon-last-read",
+    "mubook-hon-epub-font-sizes"
 ];
 
 /** sessionStorageの全キー */

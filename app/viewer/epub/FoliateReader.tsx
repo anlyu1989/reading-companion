@@ -15,6 +15,7 @@ import { Loading } from "../../components/Loading";
 import { joinMemoStock } from "../../utils/joinMemoStock";
 import { addToMemoStock, MemoStockItem } from "../../utils/addToMemoStock";
 import { clearIndexedDBCache } from "../../lib/clearIndexedDBCache";
+import { typedStorage } from "../../lib/storageKeys";
 import { extractFullText } from "./extractFullText";
 import { isPWAStandaloneMode } from "../../lib/pwa";
 import { saveLastRead } from "../../lib/usePWAFreshLaunch";
@@ -225,7 +226,12 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [viewerState, setViewerState] = useState<ViewerState>({ status: "waiting-src" });
     const [menuState, setMenuState] = useState<"open" | "closed">("closed");
     const [layoutMode, setLayoutMode] = useState<"paginated" | "scrolled">("paginated");
-    const [fontSize, setFontSize] = useState(100); // percentage
+    const [fontSize, setFontSize] = useState(() => {
+        if (typeof window === "undefined") return 100;
+        const fontSizes = typedStorage.get("mubook-hon-epub-font-sizes");
+        return fontSizes?.[props.id] ?? 100;
+    }); // percentage
+    const fontSizeRef = useRef(fontSize);
     const viewRef = useRef<FoliateView | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const isInitialized = useRef(false);
@@ -477,14 +483,15 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     detail.doc.fonts.ready.then(() => {
                         console.debug("[FoliateReader] fonts ready, applying styles", {
                             hasRenderer: !!viewRef.current?.renderer,
-                            hasSetStyles: !!viewRef.current?.renderer?.setStyles
+                            hasSetStyles: !!viewRef.current?.renderer?.setStyles,
+                            fontSize: fontSizeRef.current
                         });
                         viewRef.current?.renderer?.setStyles?.(
                             getCSS({
                                 spacing: 1.4,
                                 justify: true,
                                 hyphenate: true,
-                                fontSize: 100
+                                fontSize: fontSizeRef.current
                             })
                         );
                     });
@@ -711,13 +718,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     throw openError;
                 }
 
-                // Set styles (fontSize: 100 = 16px base)
+                // Set styles (fontSize from saved settings or 100 = 16px base)
                 view.renderer.setStyles?.(
                     getCSS({
                         spacing: 1.4,
                         justify: true,
                         hyphenate: true,
-                        fontSize: 100
+                        fontSize: fontSizeRef.current
                     })
                 );
 
@@ -1109,18 +1116,27 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         });
     }, []);
 
-    const applyFontSize = useCallback((size: number) => {
-        const view = viewRef.current;
-        if (!view?.renderer?.setStyles) return;
-        view.renderer.setStyles(
-            getCSS({
-                spacing: 1.4,
-                justify: true,
-                hyphenate: true,
-                fontSize: size
-            })
-        );
-    }, []);
+    const applyFontSize = useCallback(
+        (size: number) => {
+            const view = viewRef.current;
+            if (!view?.renderer?.setStyles) return;
+            view.renderer.setStyles(
+                getCSS({
+                    spacing: 1.4,
+                    justify: true,
+                    hyphenate: true,
+                    fontSize: size
+                })
+            );
+            // Update ref for use in load event handler
+            fontSizeRef.current = size;
+            // Save font size per book to localStorage
+            const fontSizes = typedStorage.get("mubook-hon-epub-font-sizes") ?? {};
+            fontSizes[props.id] = size;
+            typedStorage.set("mubook-hon-epub-font-sizes", fontSizes);
+        },
+        [props.id]
+    );
 
     const increaseFontSize = useCallback(() => {
         setFontSize((prev) => {
