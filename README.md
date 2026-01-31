@@ -25,7 +25,7 @@ mubook-hon is EPUB/PDF reader + Notion Sync + Memo.
 - WebSite: <https://mubook-hon.jser.workers.dev/>
 - Document: <https://efcl.notion.site/mubook-hon-addce6c324d44d749a73748f92e3a1a6>
 
-You need to set up Notion before using memo features.
+You need to set up Notion before using sync/memo features.
 
 ## Features
 
