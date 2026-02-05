@@ -180,9 +180,12 @@ const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean
         /* Prevent iOS Safari from auto-adjusting text size */
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
+        /* Prevent iOS bounce/overscroll effect */
+        overscroll-behavior: none;
     }
     body {
         font-size: inherit;
+        overscroll-behavior: none;
     }
     p, li, blockquote, dd {
         line-height: ${options.spacing};
