@@ -177,6 +177,9 @@ const getCSS = (options: { spacing: number; justify: boolean; hyphenate: boolean
         color: black;
         /* Set base font size. EPUB's relative sizes (em, rem, %) will scale from this base. */
         font-size: ${BASE_FONT_SIZE_PX * (options.fontSize / 100)}px !important;
+        /* Prevent iOS Safari from auto-adjusting text size */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
     }
     body {
         font-size: inherit;
