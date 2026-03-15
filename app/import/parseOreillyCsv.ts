@@ -134,7 +134,8 @@ export const convertCsvToImportBookMemo = (rows: OreillyCsvRow[]): ImportBookMem
     }
     const firstRow = rows[0];
     const fileId = extractBookId(firstRow.bookUrl);
-    const memos = rows.map((row, index) => {
+    // CSV is in newest-first order, reverse to get chronological order
+    const memos = rows.toReversed().map((row, index) => {
         let memo = row.highlight;
         if (row.personalNote.trim()) {
             memo += `\n---\nNote: ${row.personalNote.trim()}`;
