@@ -1,8 +1,7 @@
 "use client";
 import "../sakura.css";
 import { useNotionSetting } from "../notion/useNotion";
-import { useDropbox } from "../dropbox/useDropbox";
-import { useMemo, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useUserSettings } from "./useUserSettings";
 import { TapZoneSettings } from "./TapZoneSettings";
@@ -19,32 +18,12 @@ export default function Page() {
     const ready = useReady();
     const { notionSetting, updateNotionSettings } = useNotionSetting();
     const { userSettings, updateUserSettings } = useUserSettings();
-    const { accessTokenStatus, AuthUrl } = useDropbox();
-    const DropboxFilePath = useMemo(() => {
-        if (typeof navigator === "undefined") {
-            return <b>~/Dropbox/Apps/mubook-hon</b>;
-        }
-        return navigator.languages.includes("ja") ? (
-            <b>~/Dropbox/アプリ/mubook-hon</b>
-        ) : (
-            <b>~/Dropbox/Apps/mubook-hon</b>
-        );
-    }, []);
     if (!ready) {
         return <div className={"main"}></div>;
     }
     return (
         <div className={"main"}>
             <h1>Settings</h1>
-            <div>
-                <h2>Dropbox</h2>
-                <p>You can put books into {DropboxFilePath}</p>
-                <div>
-                    <p>{accessTokenStatus === "valid" ? "✅ Already Logged in" : "❌ Not logged in"}</p>
-                    <span>➡️️</span>
-                    <AuthUrl />
-                </div>
-            </div>
             <div>
                 <h2>Notion</h2>
                 <div>

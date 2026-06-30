@@ -1,15 +1,11 @@
 "use client";
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useOnetimeStorage } from "../settings/TemporaryStorage";
-import { Dropbox, DropboxResponse } from "dropbox";
-import useSWR, { Fetcher, mutate, SWRConfig } from "swr";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
+import { SWRConfig } from "swr";
 import { useIDBCacheProvider } from "../lib/useIDBCacheProvider";
-import { useDropbox } from "../dropbox/useDropbox";
+import { useBookBlob } from "../library/useBookBlob";
 import "./toast.css";
 import type { BibiReaderProps } from "./bibi-epub/BibiReader";
-import type { FoliateReaderProps } from "./epub/FoliateReader";
 import { useSearchParams } from "next/navigation";
-import { files } from "dropbox/types/dropbox_types";
 import { Loading } from "../components/Loading";
 import dynamic from "next/dynamic";
 
@@ -23,107 +19,6 @@ const PdfReader = dynamic(() => import("./pdf/PdfReader").then((mod) => ({ defau
 const KindleReader = dynamic(() => import("./kindle/KindleReader").then((mod) => ({ default: mod.KindleReader })), {
     ssr: false
 });
-
-const useDropboxAPI = (dropbox: Dropbox | null, props: { fileId: string; noCache: boolean }) => {
-    const onetimeStorage = useOnetimeStorage();
-    const fileFetcher: Fetcher<
-        DropboxResponse<files.FileMetadata>["result"] & { fileBlob: Blob },
-        { fileId: string }
-    > = async ({ fileId }) => {
-        // テスト用のグローバルキャッシュをチェック
-        // @ts-expect-error -- テスト用のグローバルキャッシュ
-        const globalCache = window.__TEST_DROPBOX_CACHE__;
-        if (globalCache && globalCache[fileId]) {
-            console.debug("Using global cache for fileId", fileId);
-            return globalCache[fileId];
-        }
-
-        if (!dropbox) {
-            throw new Error("no dropbox client");
-        }
-        console.debug("download dropbox fileId", fileId);
-        return dropbox
-            .filesDownload({
-                path: fileId
-            })
-            .then((res) => {
-                if (res.status !== 200) {
-                    throw new Error(`dropbox download error: ${res.status}`);
-                }
-                if (!res.result) {
-                    throw new Error("dropbox download result is empty");
-                }
-                // clear storage for this file. noCache config will be reset
-                onetimeStorage.del(fileId);
-                // create a blob from the fileBlob
-                return res.result as DropboxResponse<files.FileMetadata>["result"] & { fileBlob: Blob };
-            })
-            .catch((error) => {
-                console.error("Error downloading file from Dropbox:", error);
-                // If the file is not found, return an empty result
-                if (error.status === 409) {
-                    return {
-                        name: "",
-                        id: "",
-                        fileBlob: new Blob(),
-                        path_lower: "",
-                        path_display: ""
-                    } as DropboxResponse<files.FileMetadata>["result"] & { fileBlob: Blob };
-                }
-                throw error;
-            });
-    };
-    const { data: downloadResponse, error: itemListsError } = useSWR(
-        () =>
-            dropbox
-                ? {
-                      cacheKey: "/dropbox/filesDownload",
-                      fileId: props.fileId
-                  }
-                : undefined,
-        fileFetcher,
-        {
-            revalidateIfStale: props.noCache,
-            revalidateOnFocus: props.noCache
-        }
-    );
-    const removeCache = useCallback(() => {
-        return mutate(
-            () => {
-                return {
-                    cacheKey: "/dropbox/filesDownload",
-                    fileId: props.fileId
-                };
-            },
-            undefined,
-            { revalidate: false }
-        );
-    }, [props.fileId]);
-    const fileBlobUrl = useMemo(() => {
-        if (!downloadResponse) {
-            return;
-        }
-        return URL.createObjectURL(downloadResponse.fileBlob);
-    }, [downloadResponse]);
-    const fileBlob = useMemo(() => {
-        if (!downloadResponse) {
-            return;
-        }
-        return downloadResponse.fileBlob;
-    }, [downloadResponse]);
-    const fileDisplayName = useMemo(() => {
-        if (!downloadResponse) {
-            return "";
-        }
-        return downloadResponse.name ?? "";
-    }, [downloadResponse]);
-    return {
-        fileDisplayName,
-        fileBlobUrl,
-        fileBlob,
-        removeCache
-    } as const;
-};
 
 function ViewerContentInner() {
     const searchParams = useSearchParams();
@@ -190,12 +85,7 @@ const App = (
     }
 ) => {
     const id = props.id;
-    const onetimeStorage = useOnetimeStorage();
-    const { dropboxClient, accessTokenStatus, AuthUrl } = useDropbox({});
-    const { fileBlobUrl, fileBlob, fileDisplayName, removeCache } = useDropboxAPI(dropboxClient, {
-        fileId: id,
-        noCache: onetimeStorage.get(id)?.noCache ?? false
-    });
+    const { fileBlobUrl, fileBlob, fileDisplayName, removeCache } = useBookBlob(id);
     const [tooLoadLong, setTooLoadLong] = useState(false);
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -210,18 +100,6 @@ const App = (
             location.reload();
         });
     }, [removeCache]);
-    if (accessTokenStatus === "none") {
-        return null;
-    }
-    if (accessTokenStatus === "invalid") {
-        return (
-            <div>
-                <Suspense fallback={<Loading>loading...</Loading>}>
-                    <AuthUrl />
-                </Suspense>
-            </div>
-        );
-    }
     return (
         <>
             {props.viewerType === "kindle" && (

@@ -1,13 +1,12 @@
 "use client";
-import { FC, Suspense, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { FC, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useDropbox } from "./dropbox/useDropbox";
 import { useSearchParams } from "next/navigation";
 import { useNotionList } from "./notion/useNotionList";
 import { Loading } from "./components/Loading";
 import { useUserSettings } from "./settings/useUserSettings";
-import { useDropboxAPI } from "./dropbox/useDropboxAPI";
 import { usePWAFreshLaunch, useLastRead } from "./lib/usePWAFreshLaunch";
+import { useLibrary, type LibraryItem } from "./library/useLibrary";
 
 const emptySubscribe = () => () => {};
 const useReady = () => {
@@ -27,31 +26,33 @@ const useSearch = (initialSearch: string) => {
         onInputSearch
     };
 };
-// 24時間をミリ秒で表現
+
 const RESUME_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+const viewerTypeForBook = (item: LibraryItem) => (item.type === "epub" ? "epub:foliate" : "pdf:pdfjs");
+
+const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+};
 
 const HomeContent: FC = () => {
     const ready = useReady();
     const { userSettings } = useUserSettings();
     const searchParams = useSearchParams();
     const { recentBooks, isLoadingRecentBooks } = useNotionList();
-    const path = searchParams?.get("code");
-    const { dropboxClient, accessTokenStatus, AuthUrl } = useDropbox({
-        code: path ?? undefined
-    });
-    const currentPath = searchParams?.get("path");
     const { searchInput, onInputSearch } = useSearch(searchParams?.get("filter") || "");
-    const { sortedItems } = useDropboxAPI(dropboxClient, {
-        filterQuery: searchInput,
-        path: currentPath ?? ""
-    });
+    const { items, isLoading: isLoadingLibrary, importFiles, removeBook } = useLibrary(searchInput);
 
-    // PWA新規起動判定
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [importStatus, setImportStatus] = useState<string | null>(null);
+
     const isFreshLaunch = usePWAFreshLaunch();
     const lastRead = useLastRead();
     const [isAutoNavigating, setIsAutoNavigating] = useState(false);
 
-    // bfcacheから復元された場合はリロード
     useEffect(() => {
         const handlePageShow = (e: PageTransitionEvent) => {
             if (e.persisted) {
@@ -62,37 +63,43 @@ const HomeContent: FC = () => {
         return () => window.removeEventListener("pageshow", handlePageShow);
     }, []);
 
-    // PWA起動時の自動遷移
     useEffect(() => {
-        // 認証状態が確定するまで待つ
-        if (accessTokenStatus === "none") {
-            return;
-        }
-
-        // 認証が無効なら遷移しない（認証画面を表示する）
-        if (accessTokenStatus === "invalid") {
-            return;
-        }
-
-        if (!isFreshLaunch || !lastRead) {
-            return;
-        }
-
-        // 24時間以内かチェック
-        const now = Date.now();
-        const isWithin24Hours = now - lastRead.timestamp < RESUME_THRESHOLD_MS;
-
-        if (!isWithin24Hours) {
-            return;
-        }
-
-        // 自動遷移を実行
+        if (!isFreshLaunch || !lastRead) return;
+        const isWithin24Hours = Date.now() - lastRead.timestamp < RESUME_THRESHOLD_MS;
+        if (!isWithin24Hours) return;
         setIsAutoNavigating(true);
-        const targetUrl = `/viewer?id=${encodeURIComponent(lastRead.fileId)}&viewer=${encodeURIComponent(lastRead.viewer)}`;
-        window.location.href = targetUrl;
-    }, [isFreshLaunch, lastRead, accessTokenStatus]);
+        window.location.href = `/viewer?id=${encodeURIComponent(lastRead.fileId)}&viewer=${encodeURIComponent(lastRead.viewer)}`;
+    }, [isFreshLaunch, lastRead]);
 
-    // 自動遷移中はローディング表示
+    const handleFiles = useCallback(
+        async (files: FileList | File[]) => {
+            const { added, errors } = await importFiles(files);
+            const errCount = errors.length;
+            setImportStatus(
+                errCount === 0 ? `已导入 ${added} 本书` : `导入 ${added} 本,${errCount} 本失败 (仅支持 .epub / .pdf)`
+            );
+            window.setTimeout(() => setImportStatus(null), 4000);
+        },
+        [importFiles]
+    );
+
+    const onSelectFiles = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (e.target.files) handleFiles(e.target.files);
+            e.target.value = ""; // reset so the same file can be re-selected
+        },
+        [handleFiles]
+    );
+
+    const onDrop = useCallback(
+        (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            setIsDragging(false);
+            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+        },
+        [handleFiles]
+    );
+
     if (isAutoNavigating && lastRead) {
         return (
             <div className={"main"}>
@@ -101,214 +108,159 @@ const HomeContent: FC = () => {
         );
     }
 
+    if (!ready) {
+        return (
+            <div className={"main"}>
+                <Loading>Loading...</Loading>
+            </div>
+        );
+    }
+
     return (
         <div className={"main"}>
-            {!ready ? (
-                <Loading>Loading...</Loading>
-            ) : accessTokenStatus === "none" ? (
-                <Loading>Checking Dropbox Access Token...</Loading>
-            ) : accessTokenStatus === "invalid" ? (
-                <div>
-                    <h1>mubook-hon</h1>
-                    <p>mubook-hon requires to access your dropbox account.</p>
-                    <Suspense fallback={<Loading>Loading Dropbox Auth Url...</Loading>}>
-                        ➡️ <AuthUrl />
-                    </Suspense>
-                    <div>
-                        <h3>Why need to connect Dropbox?</h3>
-                        <ul>
-                            <li>mubook-hon downloads epub/pdf files from your dropbox account</li>
-                            <li>
-                                After connect, You can put your epub/pdf files to <b>~/Dropbox/Apps/mubook-hon</b>{" "}
-                                directory
-                            </li>
-                        </ul>
+            <header>
+                <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+                    <div style={{ flex: 1, justifyContent: "flex-start" }}>
+                        <h1 style={{ margin: 0 }}>
+                            <Link href={"/"}>
+                                <img
+                                    src={"/icons/icon-256x256.png"}
+                                    style={{ width: "1em", height: "1em", margin: "0" }}
+                                    alt={"reading-companion"}
+                                />
+                            </Link>
+                        </h1>
                     </div>
-                    <div>
-                        <p>
-                            For more details, please see{" "}
-                            <a
-                                href={"https://efcl.notion.site/mubook-hon-addce6c324d44d749a73748f92e3a1a6"}
-                                target={"_blank"}
-                                rel={"noopener noreferrer"}
-                            >
-                                Document
-                            </a>
-                        </p>
+                    <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "1em" }}>
+                        <Link href={"/settings"} style={{ fontSize: "1.2em" }} title={"Settings"}>
+                            ⚙️Settings
+                        </Link>
                     </div>
                 </div>
-            ) : (
-                <>
-                    <header>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "row",
-                                alignItems: "center"
-                            }}
+            </header>
+
+            <h2>Recent Books</h2>
+            <details>
+                <summary>
+                    {isLoadingRecentBooks ? (
+                        "Loading recent books..."
+                    ) : !recentBooks || recentBooks.length === 0 ? (
+                        "No recent books (configure Notion in Settings to enable)"
+                    ) : (
+                        <a
+                            href={`/viewer?id=${encodeURIComponent(recentBooks[0].fileId)}&viewer=${encodeURIComponent(recentBooks[0].viewer)}`}
                         >
-                            <div
+                            📖 {recentBooks[0].fileName}
+                        </a>
+                    )}
+                </summary>
+                <ul>
+                    {recentBooks?.slice(1).map((item) => (
+                        <li key={item.fileId}>
+                            📖{" "}
+                            <a
+                                href={`/viewer?id=${encodeURIComponent(item.fileId)}&viewer=${encodeURIComponent(item.viewer)}`}
+                                target={userSettings?.openNewTab ? "_blank" : undefined}
+                                rel={userSettings?.openNewTab ? "noopener" : undefined}
+                            >
+                                {item.fileName}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </details>
+
+            <h2>My Library</h2>
+
+            <div
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                    border: `2px dashed ${isDragging ? "#0070f3" : "#ccc"}`,
+                    background: isDragging ? "#eef6ff" : "#fafafa",
+                    borderRadius: 8,
+                    padding: "1.5em",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    marginBottom: "1em",
+                    transition: "all 0.15s ease"
+                }}
+            >
+                <div style={{ fontSize: "2em", marginBottom: "0.3em" }}>📚</div>
+                <div>拖拽 epub / pdf 到这里,或点击选择文件</div>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".epub,.pdf"
+                    multiple
+                    onChange={onSelectFiles}
+                    style={{ display: "none" }}
+                />
+            </div>
+
+            {importStatus && (
+                <div style={{ padding: "0.5em 1em", background: "#e6f7e6", borderRadius: 4, marginBottom: "1em" }}>
+                    {importStatus}
+                </div>
+            )}
+
+            <form style={{ display: "flex", flexDirection: "row" }} onSubmit={(event) => event.preventDefault()}>
+                <label htmlFor={"input-search"}>🔎</label>
+                <input
+                    id="input-search"
+                    type={"text"}
+                    value={searchInput}
+                    onInput={onInputSearch}
+                    style={{ flex: 1, marginLeft: "0.5em", fontSize: "16px" }}
+                />
+            </form>
+
+            {isLoadingLibrary ? (
+                <Loading>Loading library...</Loading>
+            ) : items.length === 0 ? (
+                <p style={{ color: "#666", marginTop: "1em" }}>书架空空如也,导入一本书开始阅读吧。</p>
+            ) : (
+                <ul>
+                    {items.map((item) => (
+                        <li key={item.id} style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+                            <a
+                                href={`/viewer?id=${encodeURIComponent(item.id)}&viewer=${encodeURIComponent(viewerTypeForBook(item))}`}
+                                target={userSettings?.openNewTab ? "_blank" : undefined}
+                                rel={userSettings?.openNewTab ? "noopener" : undefined}
+                                style={{ flex: 1 }}
+                            >
+                                {item.type === "epub" ? "📘" : "📄"} {item.fileName}
+                            </a>
+                            <span style={{ color: "#888", fontSize: "0.85em" }}>{formatSize(item.size)}</span>
+                            <button
+                                onClick={async () => {
+                                    if (confirm(`删除「${item.fileName}」?`)) await removeBook(item.id);
+                                }}
+                                title="删除"
                                 style={{
-                                    flex: 1,
-                                    justifyContent: "flex-start"
+                                    border: "none",
+                                    background: "transparent",
+                                    cursor: "pointer",
+                                    color: "#888",
+                                    fontSize: "1em"
                                 }}
                             >
-                                <h1 style={{ margin: 0 }}>
-                                    <Link href={"/"}>
-                                        <img
-                                            src={"/icons/icon-256x256.png"}
-                                            style={{
-                                                width: "1em",
-                                                height: "1em",
-                                                margin: "0"
-                                            }}
-                                            alt={"mubook-hon"}
-                                        />
-                                    </Link>
-                                </h1>
-                            </div>
-                            <div
-                                style={{
-                                    flex: 1,
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                    gap: "1em"
-                                }}
-                            >
-                                <Link
-                                    href={"/settings"}
-                                    style={{
-                                        fontSize: "1.2em"
-                                    }}
-                                    title={"Settings"}
-                                >
-                                    ⚙️Settings
-                                </Link>
-                                <Link
-                                    href={"https://efcl.notion.site/mubook-hon-addce6c324d44d749a73748f92e3a1a6"}
-                                    style={{
-                                        fontSize: "1.2em"
-                                    }}
-                                    target={"_blank"}
-                                    title={"Document"}
-                                >
-                                    📝
-                                </Link>
-                                <Link
-                                    href={"https://github.com/sponsors/azu"}
-                                    style={{
-                                        fontSize: "1.2em"
-                                    }}
-                                    target={"_blank"}
-                                    title={"GitHub Sponsors"}
-                                >
-                                    ❤️
-                                </Link>
-                                <Link
-                                    href={"https://github.com/azu/mubook-hon"}
-                                    style={{
-                                        fontSize: "1.2em"
-                                    }}
-                                    target={"_blank"}
-                                    title={"Source Code"}
-                                >
-                                    ℹ️
-                                </Link>
-                            </div>
-                        </div>
-                    </header>
-                    <h2>Recent Books</h2>
-                    <details>
-                        <summary>
-                            {isLoadingRecentBooks ? (
-                                "Loading recent books..."
-                            ) : recentBooks?.length === 0 ? (
-                                "No recent books"
-                            ) : (
-                                // Use <a> instead of Link to force full page reload
-                                // This prevents foliate-view state corruption from SPA navigation
-                                <a
-                                    href={`/viewer?id=${encodeURIComponent(recentBooks?.at(0)?.fileId ?? "")}&viewer=${encodeURIComponent(recentBooks?.at(0)?.viewer ?? "")}`}
-                                >
-                                    📖 {recentBooks?.at(0)?.fileName}
-                                </a>
-                            )}
-                        </summary>
-                        <ul>
-                            {recentBooks?.slice(1).map((item) => {
-                                return (
-                                    <li key={item.fileId}>
-                                        📖{" "}
-                                        <a
-                                            href={`/viewer?id=${encodeURIComponent(item.fileId)}&viewer=${encodeURIComponent(item.viewer)}`}
-                                            target={userSettings?.openNewTab ? "_blank" : undefined}
-                                            rel={userSettings?.openNewTab ? "noopener" : undefined}
-                                        >
-                                            {item.fileName}
-                                        </a>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </details>
-                    <h2>Book List</h2>
-                    <form
-                        style={{ display: "flex", flexDirection: "row" }}
-                        onSubmit={(event) => event.preventDefault()}
-                    >
-                        <label htmlFor={"input-search"}>🔎</label>
-                        <input
-                            id="input-search"
-                            type={"text"}
-                            value={searchInput}
-                            onInput={onInputSearch}
-                            style={{ flex: 1, marginLeft: "0.5em", fontSize: "16px" }}
-                        />
-                    </form>
-                    <ul>
-                        {sortedItems.map((item) => {
-                            if (item[".tag"] === "folder") {
-                                return (
-                                    <li key={item.path_lower}>
-                                        📁
-                                        <Link
-                                            href={{
-                                                pathname: "/",
-                                                query: {
-                                                    path: item.path_lower
-                                                }
-                                            }}
-                                        >
-                                            {item.path_display}
-                                        </Link>
-                                    </li>
-                                );
-                            }
-                            return (
-                                <li key={item.path_lower}>
-                                    {/* Use <a> instead of Link to force full page reload */}
-                                    {/* This prevents foliate-view state corruption from SPA navigation */}
-                                    <a
-                                        href={`/viewer?id=${encodeURIComponent((item as { id: string }).id)}&viewer=${encodeURIComponent(item.path_lower?.endsWith(".epub") ? "epub:foliate" : "pdf:pdfjs")}`}
-                                        target={userSettings?.openNewTab ? "_blank" : undefined}
-                                        rel={userSettings?.openNewTab ? "noopener" : undefined}
-                                    >
-                                        {item.path_display}
-                                    </a>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </>
+                                ✕
+                            </button>
+                        </li>
+                    ))}
+                </ul>
             )}
         </div>
     );
 };
 
 const Home: FC = () => {
-    // HomeContentコンポーネントはuseSearchParamsとDropbox APIを使用するため、
-    // Suspenseで囲んでクライアントサイドレンダリングを適切に処理します。
-    // これにより、データ取得中のローディング状態を適切に表示できます。
     return (
         <Suspense fallback={<Loading>Loading...</Loading>}>
             <HomeContent />
