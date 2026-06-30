@@ -170,3 +170,59 @@
     margin-left: 0.125em;
     font-size: 0.75em;
 }
+
+.navButton {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 64px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.15);
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 2rem;
+    font-weight: 300;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 100;
+    opacity: 0.35;
+    transition:
+        opacity 0.18s ease,
+        background 0.18s ease,
+        color 0.18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.navButton:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+}
+
+.navButton:focus-visible {
+    outline: 2px solid #0070f3;
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+.navLeft {
+    left: 10px;
+}
+
+.navRight {
+    right: 10px;
+}
+
+/* Touch devices: hide the helpers since Foliate's tap zones already work */
+@media (pointer: coarse) {
+    .navButton {
+        display: none;
+    }
+}

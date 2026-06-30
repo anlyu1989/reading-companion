@@ -1399,6 +1399,29 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
                 <ToastComponent onClickJumpLastPage={onClickJumpLastPage} />
 
+                {viewerState.status === "ready" && (
+                    <>
+                        <button
+                            className={`${styles.navButton} ${styles.navLeft}`}
+                            onClick={() => viewRef.current?.prev()}
+                            aria-label="上一页"
+                            title="上一页 (←)"
+                            type="button"
+                        >
+                            ‹
+                        </button>
+                        <button
+                            className={`${styles.navButton} ${styles.navRight}`}
+                            onClick={() => viewRef.current?.next()}
+                            aria-label="下一页"
+                            title="下一页 (→)"
+                            type="button"
+                        >
+                            ›
+                        </button>
+                    </>
+                )}
+
                 {/* Position indicator - temporary on page turn, always visible when menu is open */}
                 {viewerState.status === "ready" && latestRelocateDetail && (
                     <div
