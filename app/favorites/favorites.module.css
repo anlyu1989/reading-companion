@@ -144,6 +144,31 @@
     margin-bottom: 10px;
 }
 
+.analysis {
+    background: var(--color-brand-soft);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--color-brand);
+}
+
+.analysisLabel {
+    font-size: 11px;
+    color: var(--color-brand-strong);
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.analysisText {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .rowFoot {
     display: flex;
     align-items: center;

@@ -36,6 +36,7 @@ function ViewerContentInner() {
     const initialMarker = searchParams?.get("marker") ?? undefined;
     const translation = searchParams?.has("translation") ?? false;
     const fileId = searchParams?.get("id");
+    const highlightText = searchParams?.get("highlight") ?? undefined;
     if (!fileId) {
         return <div>ID not found</div>;
     }
@@ -59,6 +60,7 @@ function ViewerContentInner() {
                 initialPage={initialPage}
                 initialMarker={initialMarker}
                 translation={translation}
+                highlightText={highlightText}
             />
         </SWRConfig>
     );
@@ -84,6 +86,7 @@ const LoadingBook = (props: { tooLoadingLong: boolean; onClickReloadWithoutCache
 const App = (
     props: Pick<BibiReaderProps, "id" | "initialPage" | "initialMarker" | "translation"> & {
         viewerType: "epub:bibi" | "epub:foliate" | "pdf:pdfjs" | "kindle";
+        highlightText?: string;
     }
 ) => {
     const id = props.id;
@@ -153,6 +156,7 @@ const App = (
                         fileBlob={fileBlob}
                         initialPage={props.initialPage}
                         initialMarker={props.initialMarker}
+                        highlightText={props.highlightText}
                         onClearCache={removeCache}
                     />
                 </Suspense>

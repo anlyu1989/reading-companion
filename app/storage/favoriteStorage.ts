@@ -18,6 +18,10 @@ export type Favorite = {
     chatId?: string;
     context?: string;
     note?: string;
+    /** AI 生成的附加分析:
+     * - word 直接收藏时是字典查询(词性 + 词义)
+     * - 通过 Panel 收藏的句子/单词附带当前会话的 AI 解释 */
+    aiAnalysis?: string;
     createdAt: number;
 };
 

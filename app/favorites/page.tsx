@@ -36,6 +36,10 @@ const buildOriginUrl = (fav: Favorite) => {
     params.set("id", fav.bookId);
     params.set("viewer", "epub:foliate");
     if (fav.cfi) params.set("marker", encodeBookMarker({ cfi: fav.cfi }));
+    // 只对句子/单词类型 + 有 cfi 的项发送 highlight (answer 类没必要)
+    if (fav.cfi && (fav.type === "sentence" || fav.type === "word") && fav.text) {
+        params.set("highlight", fav.text);
+    }
     return `/viewer?${params.toString()}`;
 };
 
@@ -62,6 +66,12 @@ const FavoriteRow: FC<{ fav: Favorite; onRemove: (id: string) => void }> = ({ fa
                 </button>
             </div>
             <div className={styles.text}>{fav.text}</div>
+            {fav.aiAnalysis && (
+                <div className={styles.analysis}>
+                    <div className={styles.analysisLabel}>✨ AI 分析</div>
+                    <div className={styles.analysisText}>{fav.aiAnalysis}</div>
+                </div>
+            )}
             <div className={styles.rowFoot}>
                 {canJump ? (
                     <a href={buildOriginUrl(fav)} target="_blank" rel="noopener" className={styles.jumpBtn}>

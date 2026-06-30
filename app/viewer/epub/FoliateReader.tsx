@@ -20,6 +20,7 @@ import { extractFullText } from "./extractFullText";
 import { isPWAStandaloneMode } from "../../lib/pwa";
 import { saveLastRead } from "../../lib/usePWAFreshLaunch";
 import { useChat } from "../../chat/ChatContext";
+import { addFavorite } from "../../storage/favoriteStorage";
 import styles from "./FoliateReader.module.css";
 
 export type FoliateReaderProps = {
@@ -29,6 +30,8 @@ export type FoliateReaderProps = {
     fileBlob?: Blob;
     initialPage?: string;
     initialMarker?: string;
+    /** 跳转后在 epub iframe 内 search 这段文字,wrap mark.rc-flash,3 秒后淡出移除 */
+    highlightText?: string;
     onClearCache?: () => Promise<unknown>;
 };
 
@@ -355,6 +358,30 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
     const [positionIndicatorVisible, setPositionIndicatorVisible] = useState(false);
     const positionIndicatorTimeoutRef = useRef<number | null>(null);
 
+    // Selection toolbar (floating buttons above current selection in epub)
+    const [selToolbar, setSelToolbar] = useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        text: string;
+        cfi: string;
+    }>({ visible: false, x: 0, y: 0, text: "", cfi: "" });
+
+    // 跳转回原文时显示 banner 提示 (Foliate paginator 反复 swap iframe doc,
+    // 在 iframe 内 wrap mark 不稳定 — 改用 viewer 上方 banner 显示已跳转 + 原文片段)
+    // 跳转回原文时显示 banner — React state 渲染,不自动隐藏(避免 StrictMode/HMR
+    // 多次 mount 让 setTimeout 行为不可靠),提供 ✕ 关闭按钮让用户手动消除
+    const [highlightBanner, setHighlightBanner] = useState<string | null>(null);
+    const bannerFiredRef = useRef(false);
+    useEffect(() => {
+        if (viewerState.status !== "ready") return;
+        if (bannerFiredRef.current) return;
+        const t = props.highlightText;
+        if (!t || t.length < 2) return;
+        bannerFiredRef.current = true;
+        setHighlightBanner(t);
+    }, [viewerState.status, props.highlightText]);
+
     // Handle Safari bfcache: reload page when restored from back-forward cache
     useEffect(() => {
         const handlePageShow = (e: PageTransitionEvent) => {
@@ -511,8 +538,38 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         "selectionchange",
                         (e) => {
                             const selection = detail.doc.getSelection();
-                            if (selection && selection.toString().trim()) {
+                            const text = selection?.toString().trim() || "";
+                            if (text) {
                                 setCanMemoContent(true);
+                            }
+                            // Update floating selection toolbar
+                            if (text && selection && selection.rangeCount > 0) {
+                                try {
+                                    const range = selection.getRangeAt(0);
+                                    const selRect = range.getBoundingClientRect();
+                                    const iframeEl = detail.doc.defaultView?.frameElement as HTMLElement | null;
+                                    if (iframeEl && selRect.width > 0) {
+                                        const iframeRect = iframeEl.getBoundingClientRect();
+                                        const view = viewRef.current;
+                                        let cfi = "";
+                                        try {
+                                            if (view) cfi = view.getCFI(detail.index, range);
+                                        } catch {
+                                            /* CFI may fail across pages */
+                                        }
+                                        setSelToolbar({
+                                            visible: true,
+                                            x: iframeRect.left + selRect.left + selRect.width / 2,
+                                            y: iframeRect.top + selRect.top,
+                                            text,
+                                            cfi
+                                        });
+                                    }
+                                } catch {
+                                    /* ignore */
+                                }
+                            } else {
+                                setSelToolbar((s) => (s.visible ? { ...s, visible: false } : s));
                             }
                             // Stop paginator's selection-based page navigation
                             e.stopImmediatePropagation();
@@ -1074,21 +1131,70 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         if (!contents || contents.length === 0) return "";
         return contents[0].doc?.body?.textContent?.trim() ?? "";
     }, []);
-    const onClickAskAI = useCallback(() => {
-        const selected = getSelectedText();
-        if (!selected?.text) {
-            notify({ title: "请先在书上划一段话", type: "info" });
-            return;
+    const onToolbarSentence = useCallback(async () => {
+        if (!selToolbar.text) return;
+        try {
+            await addFavorite({
+                type: "sentence",
+                bookId: props.id,
+                bookTitle: props.bookFileName,
+                text: selToolbar.text,
+                cfi: selToolbar.cfi
+            });
+            notify({ title: "✓ 已收藏到「句子」", type: "success" });
+        } catch (e) {
+            notify({ title: `收藏失败: ${(e as Error).message}`, type: "error" });
         }
+        setSelToolbar((s) => ({ ...s, visible: false }));
+    }, [selToolbar.text, selToolbar.cfi, props.id, props.bookFileName, notify]);
+
+    const onToolbarWord = useCallback(async () => {
+        if (!selToolbar.text) return;
+        let aiAnalysis: string | undefined;
+        try {
+            const res = await fetch("/api/dict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ word: selToolbar.text })
+            });
+            if (res.ok) {
+                const data = (await res.json()) as { pos: string; definitions: string[] };
+                aiAnalysis = `${data.pos}  ${data.definitions.join(" · ")}`;
+            }
+        } catch (e) {
+            console.warn("[dict] failed", e);
+        }
+        try {
+            await addFavorite({
+                type: "word",
+                bookId: props.id,
+                bookTitle: props.bookFileName,
+                text: selToolbar.text,
+                cfi: selToolbar.cfi,
+                aiAnalysis
+            });
+            notify({
+                title: aiAnalysis ? `✓ ${selToolbar.text}: ${aiAnalysis}` : "✓ 已收藏(无词义)",
+                type: "success"
+            });
+        } catch (e) {
+            notify({ title: `收藏失败: ${(e as Error).message}`, type: "error" });
+        }
+        setSelToolbar((s) => ({ ...s, visible: false }));
+    }, [selToolbar.text, selToolbar.cfi, props.id, props.bookFileName, notify]);
+
+    const onToolbarAskAI = useCallback(() => {
+        if (!selToolbar.text) return;
         const chapterText = getCurrentChapterText();
         openChatWith({
             bookId: props.id,
             bookTitle: props.bookFileName,
-            selection: selected.text,
+            selection: selToolbar.text,
             chapterText,
-            cfi: selected.selectors.start
+            cfi: selToolbar.cfi
         });
-    }, [getSelectedText, getCurrentChapterText, openChatWith, notify, props.id, props.bookFileName]);
+        setSelToolbar((s) => ({ ...s, visible: false }));
+    }, [selToolbar.text, selToolbar.cfi, getCurrentChapterText, openChatWith, props.id, props.bookFileName]);
 
     const onClickMemo = useCallback(async () => {
         const view = viewRef.current;
@@ -1429,6 +1535,53 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
 
                 <ToastComponent onClickJumpLastPage={onClickJumpLastPage} />
 
+                {highlightBanner && (
+                    <div className={styles.highlightBanner}>
+                        <span className={styles.highlightBannerIcon}>⭐</span>
+                        <div className={styles.highlightBannerBody}>
+                            <div className={styles.highlightBannerTitle}>已跳到收藏位置</div>
+                            <div className={styles.highlightBannerText}>「{highlightBanner.slice(0, 80)}…」</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setHighlightBanner(null)}
+                            className={styles.highlightBannerClose}
+                            title="关闭"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
+                {selToolbar.visible && (
+                    <div className={styles.selToolbar} style={{ left: `${selToolbar.x}px`, top: `${selToolbar.y}px` }}>
+                        <button
+                            type="button"
+                            className={`${styles.selToolbarBtn} ${styles.selToolbarBtnFav}`}
+                            onClick={onToolbarSentence}
+                            title="收藏句子"
+                        >
+                            ⭐ 句子
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.selToolbarBtn} ${styles.selToolbarBtnWord}`}
+                            onClick={onToolbarWord}
+                            title="收藏单词(自动查词性词义)"
+                        >
+                            🔤 单词
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.selToolbarBtn} ${styles.selToolbarBtnAI}`}
+                            onClick={onToolbarAskAI}
+                            title="问 AI"
+                        >
+                            ✨ 问 AI
+                        </button>
+                    </div>
+                )}
+
                 {viewerState.status === "ready" && (
                     <>
                         <button
@@ -1448,14 +1601,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                             type="button"
                         >
                             ›
-                        </button>
-                        <button
-                            className={styles.askAIButton}
-                            onClick={onClickAskAI}
-                            title="先在书上划一段话再点"
-                            type="button"
-                        >
-                            ✨ 问 AI
                         </button>
                         <div className={styles.fontSizeBar}>
                             <button

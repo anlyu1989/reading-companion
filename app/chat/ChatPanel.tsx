@@ -103,6 +103,15 @@ export const ChatPanel: FC = () => {
         await sendFollowUp(q);
     };
 
+    // 取当前会话最后一条完成的 AI 回复,作为收藏附带的"AI 分析"
+    const lastAssistantAnalysis = (): string | undefined => {
+        for (let i = state.messages.length - 1; i >= 0; i--) {
+            const m = state.messages[i];
+            if (m.role === "assistant" && !m.isStreaming && m.content) return m.content;
+        }
+        return undefined;
+    };
+
     const favSentence = async () => {
         if (!state.bookId || !state.bookTitle || !state.selection) return;
         await addFavorite({
@@ -110,10 +119,12 @@ export const ChatPanel: FC = () => {
             bookId: state.bookId,
             bookTitle: state.bookTitle,
             text: state.selection,
-            cfi: state.cfi
+            cfi: state.cfi,
+            chatId: state.currentChatId,
+            aiAnalysis: lastAssistantAnalysis()
         });
         setSavedSentence(true);
-        showToast("✓ 已收藏到「句子」");
+        showToast("✓ 已收藏「句子」(含 AI 分析)");
     };
 
     const favWord = async () => {
@@ -123,10 +134,12 @@ export const ChatPanel: FC = () => {
             bookId: state.bookId,
             bookTitle: state.bookTitle,
             text: state.selection,
-            cfi: state.cfi
+            cfi: state.cfi,
+            chatId: state.currentChatId,
+            aiAnalysis: lastAssistantAnalysis()
         });
         setSavedWord(true);
-        showToast("✓ 已收藏到「单词」");
+        showToast("✓ 已收藏「单词」(含 AI 分析)");
     };
 
     const favAnswer = async (msgId: string, content: string) => {
