@@ -1,6 +1,11 @@
 .viewerContainer {
     position: relative;
     overflow: clip;
+    box-sizing: border-box;
+    /* Use max-width (Foliate's renderer ignores `width` setting on host) */
+    max-width: calc(100% - var(--rc-panel-w, 0px));
+    width: 100%;
+    transition: max-width 0.2s ease;
 }
 
 .menuBar {
@@ -129,10 +134,11 @@
 .positionIndicator {
     position: fixed;
     bottom: calc(2px + env(safe-area-inset-bottom, 0));
-    left: -100%;
-    right: -100%;
+    left: 0;
+    right: var(--rc-panel-w, 0px);
     margin: auto;
     width: fit-content;
+    transition: right 0.2s ease;
     background: rgba(0, 0, 0, 0.4);
     color: rgba(255, 255, 255, 0.9);
     padding: 4px 10px;
@@ -207,7 +213,7 @@
 }
 
 .navButton:focus-visible {
-    outline: 2px solid #0070f3;
+    outline: 2px solid var(--color-brand);
     outline-offset: 2px;
     opacity: 1;
 }
@@ -217,12 +223,98 @@
 }
 
 .navRight {
-    right: 10px;
+    right: calc(10px + var(--rc-panel-w, 0px));
+    transition: right 0.2s ease;
 }
 
 /* Touch devices: hide the helpers since Foliate's tap zones already work */
 @media (pointer: coarse) {
     .navButton {
         display: none;
+    }
+}
+
+.askAIButton {
+    position: fixed;
+    bottom: calc(48px + env(safe-area-inset-bottom, 0));
+    /* 让 button 在剩余可视区域(viewport - panel)居中,而不是全 viewport 居中 */
+    left: calc(50% - var(--rc-panel-w, 0px) / 2);
+    transform: translateX(-50%);
+    padding: 9px 18px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(135deg, var(--color-brand), #2bb574);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(31, 157, 90, 0.35);
+    z-index: 90;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        left 0.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.askAIButton:hover {
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 4px 14px rgba(31, 157, 90, 0.5);
+}
+
+.askAIButton:active {
+    transform: translateX(-50%) translateY(0);
+}
+
+.fontSizeBar {
+    position: fixed;
+    top: 12px;
+    right: calc(12px + var(--rc-panel-w, 0px));
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    font-family: var(--font-sans);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.fontSizeBtn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    line-height: 1;
+    min-width: 28px;
+}
+
+.fontSizeBtn:hover {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-strong);
+}
+
+.fontSizeValue {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    min-width: 36px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+@media (max-width: 600px) {
+    .fontSizeBar {
+        top: 8px;
+        right: 8px;
     }
 }

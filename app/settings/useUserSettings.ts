@@ -30,11 +30,12 @@ export const TAP_PRESET_LEFT_HAND: TapZoneGrid = [
     ["next", "menu", "prev"]
 ];
 
-// プリセット: デフォルト（ほぼ次、中段左だけ前）
+// プリセット: デフォルト（全无动作 - 用户用屏幕两侧的 ‹ › 按钮或键盘翻页;
+// 想要老的"点屏幕翻页"在 Settings → Viewer → Tap Zones 里改 right-hand / left-hand）
 export const TAP_PRESET_DEFAULT: TapZoneGrid = [
-    ["prev", "menu", "next"],
-    ["prev", "none", "next"],
-    ["next", "next", "next"]
+    ["none", "none", "none"],
+    ["none", "none", "none"],
+    ["none", "none", "none"]
 ];
 
 type UserSettings = {

@@ -1,5 +1,6 @@
 import "./global.css";
 import "./sakura.css";
+import "./styles/tokens.css";
 import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
     title: "mubook-hon",

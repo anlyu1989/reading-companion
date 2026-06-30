@@ -3,6 +3,8 @@ import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { SWRConfig } from "swr";
 import { useIDBCacheProvider } from "../lib/useIDBCacheProvider";
 import { useBookBlob } from "../library/useBookBlob";
+import { ChatProvider } from "../chat/ChatContext";
+import { ChatPanel } from "../chat/ChatPanel";
 import "./toast.css";
 import type { BibiReaderProps } from "./bibi-epub/BibiReader";
 import { useSearchParams } from "next/navigation";
@@ -101,7 +103,8 @@ const App = (
         });
     }, [removeCache]);
     return (
-        <>
+        <ChatProvider>
+            <ChatPanel />
             {props.viewerType === "kindle" && (
                 <Suspense
                     fallback={
@@ -172,6 +175,6 @@ const App = (
                     />
                 </Suspense>
             )}
-        </>
+        </ChatProvider>
     );
 };

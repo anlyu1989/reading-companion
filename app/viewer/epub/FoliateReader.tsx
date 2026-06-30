@@ -19,6 +19,7 @@ import { typedStorage } from "../../lib/storageKeys";
 import { extractFullText } from "./extractFullText";
 import { isPWAStandaloneMode } from "../../lib/pwa";
 import { saveLastRead } from "../../lib/usePWAFreshLaunch";
+import { useChat } from "../../chat/ChatContext";
 import styles from "./FoliateReader.module.css";
 
 export type FoliateReaderProps = {
@@ -965,6 +966,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             const view = viewRef.current;
             if (!view) return;
 
+            // 不在输入框 / 可编辑区域里劫持按键(否则 chat 输入 j/k 会翻页)
+            const t = event.target as HTMLElement | null;
+            if (t) {
+                const tag = t.tagName;
+                if (tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable) return;
+            }
+
             if (event.shiftKey && event.key === "A") {
                 // Stock memo
                 onClickStockMemo();
@@ -1058,6 +1066,27 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
             notify({ title: "Failed to stock memo", type: "error" });
         }
     }, [getSelectedText, getCurrentPageText, notify]);
+
+    const { openWith: openChatWith } = useChat();
+    const getCurrentChapterText = useCallback((): string => {
+        const view = viewRef.current;
+        const contents = view?.renderer?.getContents();
+        if (!contents || contents.length === 0) return "";
+        return contents[0].doc?.body?.textContent?.trim() ?? "";
+    }, []);
+    const onClickAskAI = useCallback(() => {
+        const selected = getSelectedText();
+        if (!selected?.text) {
+            notify({ title: "请先在书上划一段话", type: "info" });
+            return;
+        }
+        const chapterText = getCurrentChapterText();
+        openChatWith({
+            selection: selected.text,
+            chapterText,
+            bookTitle: props.bookFileName
+        });
+    }, [getSelectedText, getCurrentChapterText, openChatWith, notify, props.bookFileName]);
 
     const onClickMemo = useCallback(async () => {
         const view = viewRef.current;
@@ -1390,7 +1419,6 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                     ref={containerRef}
                     className={styles.viewerContainer}
                     style={{
-                        width: "100%",
                         height: hasCompletedNotionSettings
                             ? `calc(100% - ${isPWAStandaloneMode() ? MEMO_BUTTON_AREA_HEIGHT_PWA : MEMO_BUTTON_AREA_HEIGHT}px)`
                             : "100%"
@@ -1419,14 +1447,39 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
                         >
                             ›
                         </button>
+                        <button
+                            className={styles.askAIButton}
+                            onClick={onClickAskAI}
+                            title="先在书上划一段话再点"
+                            type="button"
+                        >
+                            ✨ 问 AI
+                        </button>
+                        <div className={styles.fontSizeBar}>
+                            <button
+                                onClick={decreaseFontSize}
+                                className={styles.fontSizeBtn}
+                                title="缩小字号"
+                                type="button"
+                            >
+                                A−
+                            </button>
+                            <span className={styles.fontSizeValue}>{fontSize}%</span>
+                            <button
+                                onClick={increaseFontSize}
+                                className={styles.fontSizeBtn}
+                                title="放大字号"
+                                type="button"
+                            >
+                                A+
+                            </button>
+                        </div>
                     </>
                 )}
 
                 {/* Position indicator - temporary on page turn, always visible when menu is open */}
                 {viewerState.status === "ready" && latestRelocateDetail && (
-                    <div
-                        className={`${styles.positionIndicator} ${positionIndicatorVisible || menuState === "open" ? styles.visible : styles.fadeOut}`}
-                    >
+                    <div className={`${styles.positionIndicator} ${styles.visible}`}>
                         <span className={styles.current}>
                             {latestRelocateDetail.location?.current ?? Math.round(latestRelocateDetail.fraction * 100)}
                         </span>
