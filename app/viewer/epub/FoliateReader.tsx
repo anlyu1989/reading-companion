@@ -1082,11 +1082,13 @@ export const FoliateReader: FC<FoliateReaderProps> = (props) => {
         }
         const chapterText = getCurrentChapterText();
         openChatWith({
+            bookId: props.id,
+            bookTitle: props.bookFileName,
             selection: selected.text,
             chapterText,
-            bookTitle: props.bookFileName
+            cfi: selected.selectors.start
         });
-    }, [getSelectedText, getCurrentChapterText, openChatWith, notify, props.bookFileName]);
+    }, [getSelectedText, getCurrentChapterText, openChatWith, notify, props.id, props.bookFileName]);
 
     const onClickMemo = useCallback(async () => {
         const view = viewRef.current;

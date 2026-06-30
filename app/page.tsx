@@ -132,6 +132,9 @@ const HomeContent: FC = () => {
                         </h1>
                     </div>
                     <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "1em" }}>
+                        <Link href={"/favorites"} style={{ fontSize: "1.2em" }} title={"收藏"}>
+                            ⭐收藏
+                        </Link>
                         <Link href={"/settings"} style={{ fontSize: "1.2em" }} title={"Settings"}>
                             ⚙️Settings
                         </Link>
