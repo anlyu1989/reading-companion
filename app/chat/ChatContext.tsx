@@ -38,6 +38,7 @@ type ChatContextValue = {
         chapterText: string;
         cfi: string;
     }) => Promise<void>;
+    openFreeform: (args: { bookId: string; bookTitle: string; chapterText: string; cfi: string }) => Promise<void>;
     sendFollowUp: (question: string) => Promise<void>;
     loadChat: (chatId: string) => Promise<void>;
     listHistoryForCurrentBook: () => Promise<ChatSession[]>;
@@ -74,7 +75,7 @@ const uuid = () =>
 
 const MAX_CHAPTER_CHARS = 6000;
 
-const buildSystemPrompt = (selection: string, chapterText: string, bookTitle?: string) => {
+const buildSystemPrompt = (selection: string | undefined, chapterText: string, bookTitle?: string) => {
     const titleLine = bookTitle ? `用户正在阅读《${bookTitle}》。\n` : "";
     const ctxText =
         chapterText.length > MAX_CHAPTER_CHARS
@@ -86,10 +87,15 @@ const buildSystemPrompt = (selection: string, chapterText: string, bookTitle?: s
 ${ctxText}
 """
 
-用户刚刚划出了这段话:
+${
+    selection
+        ? `用户刚刚划出了这段话:
 「${selection}」
+`
+        : "用户没有指定选区,会直接输入问题。请基于全文上下文回答。\n"
+}
 
-请围绕这段话回答用户的问题——可以解释含义、补充背景、揭示作者意图,或回应用户后续追问。回答要简洁有洞察,引用原文用「」标出。默认用中文回答。`;
+请回答用户的问题——可以解释含义、补充背景、揭示作者意图,或回应用户后续追问。回答要简洁有洞察,引用原文用「」标出。默认用中文回答。`;
 };
 
 const toStored = (messages: ChatMessage[]): StoredMessage[] =>
@@ -222,13 +228,49 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
         [streamFromAPI]
     );
 
+    const openFreeform = useCallback(
+        async ({
+            bookId,
+            bookTitle,
+            chapterText,
+            cfi
+        }: {
+            bookId: string;
+            bookTitle: string;
+            chapterText: string;
+            cfi: string;
+        }) => {
+            const session = await createChat({
+                bookId,
+                bookTitle,
+                selection: "全文自由提问",
+                cfi,
+                messages: []
+            });
+            lastSavedRef.current = "";
+            setState({
+                isPanelOpen: true,
+                showHistory: false,
+                messages: [],
+                bookId,
+                bookTitle,
+                chapterText,
+                selection: undefined,
+                cfi,
+                currentChatId: session.id,
+                isStreaming: false
+            });
+        },
+        []
+    );
+
     const sendFollowUp = useCallback(
         async (question: string) => {
             const q = question.trim();
             if (!q) return;
             const sel = state.selection;
             const ch = state.chapterText;
-            if (!sel || !ch) return;
+            if (!ch) return;
 
             const userMsg: ChatMessage = { id: uuid(), role: "user", content: q };
             const history = [...state.messages, userMsg];
@@ -281,6 +323,7 @@ export const ChatProvider: FC<{ children: ReactNode }> = ({ children }) => {
             value={{
                 state,
                 openWith,
+                openFreeform,
                 sendFollowUp,
                 loadChat,
                 listHistoryForCurrentBook,

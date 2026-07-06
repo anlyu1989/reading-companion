@@ -4,15 +4,17 @@
  * Schema 演进:
  * v1: books, bookBlobs                                       (Phase 1)
  * v2: + chats (索引 bookId, updatedAt), favorites (索引 bookId, type, createdAt)
+ * v3: + articles (索引 source, fetchedAt, publishedAt)
  */
 
 export const DB_NAME = "reading-companion";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const STORE_BOOKS = "books";
 export const STORE_BOOK_BLOBS = "bookBlobs";
 export const STORE_CHATS = "chats";
 export const STORE_FAVORITES = "favorites";
+export const STORE_ARTICLES = "articles";
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -42,6 +44,14 @@ export const openDB = (): Promise<IDBDatabase> => {
                     s.createIndex("bookId", "bookId", { unique: false });
                     s.createIndex("type", "type", { unique: false });
                     s.createIndex("createdAt", "createdAt", { unique: false });
+                }
+            }
+            if (oldVersion < 3) {
+                if (!db.objectStoreNames.contains(STORE_ARTICLES)) {
+                    const s = db.createObjectStore(STORE_ARTICLES, { keyPath: "id" });
+                    s.createIndex("source", "source", { unique: false });
+                    s.createIndex("fetchedAt", "fetchedAt", { unique: false });
+                    s.createIndex("publishedAt", "publishedAt", { unique: false });
                 }
             }
         };

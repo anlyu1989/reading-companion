@@ -16,6 +16,7 @@ export const useLibrary = (filterQuery: string = "") => {
     const items = (data ?? []).filter((b) =>
         filterQuery ? b.fileName.toLowerCase().includes(filterQuery.toLowerCase()) : true
     );
+    const allItems = data ?? [];
 
     const refresh = useCallback(() => mutate(LIBRARY_CACHE_KEY), [mutate]);
 
@@ -42,6 +43,7 @@ export const useLibrary = (filterQuery: string = "") => {
 
     return {
         items,
+        allItems,
         isLoading,
         error,
         refresh,

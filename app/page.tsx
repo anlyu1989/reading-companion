@@ -2,7 +2,6 @@
 import { FC, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useNotionList } from "./notion/useNotionList";
 import { Loading } from "./components/Loading";
 import { useUserSettings } from "./settings/useUserSettings";
 import { usePWAFreshLaunch, useLastRead } from "./lib/usePWAFreshLaunch";
@@ -37,13 +36,24 @@ const formatSize = (bytes: number) => {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
 
+const formatLastReadTime = (timestamp: number) => {
+    const diffMs = Date.now() - timestamp;
+    const diffMinutes = Math.floor(diffMs / (60 * 1000));
+    if (diffMinutes < 1) return "刚刚读过";
+    if (diffMinutes < 60) return `${diffMinutes} 分钟前读过`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} 小时前读过`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays} 天前读过`;
+    return new Date(timestamp).toLocaleDateString("zh-CN");
+};
+
 const HomeContent: FC = () => {
     const ready = useReady();
     const { userSettings } = useUserSettings();
     const searchParams = useSearchParams();
-    const { recentBooks, isLoadingRecentBooks } = useNotionList();
     const { searchInput, onInputSearch } = useSearch(searchParams?.get("filter") || "");
-    const { items, isLoading: isLoadingLibrary, importFiles, removeBook } = useLibrary(searchInput);
+    const { items, allItems, isLoading: isLoadingLibrary, importFiles, removeBook } = useLibrary(searchInput);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -52,6 +62,8 @@ const HomeContent: FC = () => {
     const isFreshLaunch = usePWAFreshLaunch();
     const lastRead = useLastRead();
     const [isAutoNavigating, setIsAutoNavigating] = useState(false);
+    const lastReadBook = lastRead ? allItems.find((item) => item.id === lastRead.fileId) : undefined;
+    const recentLocalBooks = allItems.filter((item) => item.id !== lastReadBook?.id).slice(0, 4);
 
     useEffect(() => {
         const handlePageShow = (e: PageTransitionEvent) => {
@@ -132,6 +144,9 @@ const HomeContent: FC = () => {
                         </h1>
                     </div>
                     <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "1em" }}>
+                        <Link href={"/articles"} style={{ fontSize: "1.2em" }} title={"AI Articles"}>
+                            📰文章
+                        </Link>
                         <Link href={"/favorites"} style={{ fontSize: "1.2em" }} title={"收藏"}>
                             ⭐收藏
                         </Link>
@@ -145,24 +160,37 @@ const HomeContent: FC = () => {
             <h2>Recent Books</h2>
             <details>
                 <summary>
-                    {isLoadingRecentBooks ? (
+                    {isLoadingLibrary ? (
                         "Loading recent books..."
-                    ) : !recentBooks || recentBooks.length === 0 ? (
-                        "No recent books (configure Notion in Settings to enable)"
+                    ) : lastRead && lastReadBook ? (
+                        <a
+                            href={`/viewer?id=${encodeURIComponent(lastRead.fileId)}&viewer=${encodeURIComponent(lastRead.viewer)}`}
+                            target={userSettings?.openNewTab ? "_blank" : undefined}
+                            rel={userSettings?.openNewTab ? "noopener" : undefined}
+                        >
+                            📖 {lastRead.title || lastRead.fileName}
+                            <span style={{ color: "#888", fontSize: "0.85em", marginLeft: "0.5em" }}>
+                                {formatLastReadTime(lastRead.timestamp)}
+                            </span>
+                        </a>
+                    ) : allItems.length === 0 ? (
+                        "还没有最近阅读,导入一本书开始吧"
                     ) : (
                         <a
-                            href={`/viewer?id=${encodeURIComponent(recentBooks[0].fileId)}&viewer=${encodeURIComponent(recentBooks[0].viewer)}`}
+                            href={`/viewer?id=${encodeURIComponent(allItems[0].id)}&viewer=${encodeURIComponent(viewerTypeForBook(allItems[0]))}`}
+                            target={userSettings?.openNewTab ? "_blank" : undefined}
+                            rel={userSettings?.openNewTab ? "noopener" : undefined}
                         >
-                            📖 {recentBooks[0].fileName}
+                            📖 {allItems[0].fileName}
                         </a>
                     )}
                 </summary>
                 <ul>
-                    {recentBooks?.slice(1).map((item) => (
-                        <li key={item.fileId}>
+                    {recentLocalBooks.map((item) => (
+                        <li key={item.id}>
                             📖{" "}
                             <a
-                                href={`/viewer?id=${encodeURIComponent(item.fileId)}&viewer=${encodeURIComponent(item.viewer)}`}
+                                href={`/viewer?id=${encodeURIComponent(item.id)}&viewer=${encodeURIComponent(viewerTypeForBook(item))}`}
                                 target={userSettings?.openNewTab ? "_blank" : undefined}
                                 rel={userSettings?.openNewTab ? "noopener" : undefined}
                             >
