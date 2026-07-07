@@ -35,7 +35,7 @@ const buildOriginUrl = (fav: Favorite) => {
     const params = new URLSearchParams();
     params.set("id", fav.bookId);
     params.set("viewer", "epub:foliate");
-    if (fav.cfi) params.set("marker", encodeBookMarker({ cfi: fav.cfi }));
+    if (fav.cfi) params.set("marker", encodeBookMarker({ cfi: fav.cfi, fraction: 0, sectionIndex: 0 }));
     // 只对句子/单词类型 + 有 cfi 的项发送 highlight (answer 类没必要)
     if (fav.cfi && (fav.type === "sentence" || fav.type === "word") && fav.text) {
         params.set("highlight", fav.text);
