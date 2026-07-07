@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ChatPanel } from "../../chat/ChatPanel";
 import { ChatProvider, useChat } from "../../chat/ChatContext";
 import { Loading } from "../../components/Loading";
@@ -24,12 +24,60 @@ const formatDate = (timestamp?: number) => {
     }).format(new Date(timestamp));
 };
 
+const buildFallbackHtml = (excerpt?: string) =>
+    `<p>${(excerpt || "正文还没有抓取成功,可以打开原文链接阅读。").replace(/</g, "&lt;")}</p>`;
+
+// 正文拆成 memo 子组件:selection 变化只影响 ReaderInner,ArticleBody 的 props
+// (content/excerpt/onSelection) 都稳定,memo 跳过 re-render,article DOM 不重建,
+// 浏览器划词选区得以保留。
+const ArticleBody = memo(
+    ({
+        content,
+        excerpt,
+        onSelection
+    }: {
+        content?: string;
+        excerpt?: string;
+        onSelection: (s: SelectionState | null) => void;
+    }) => {
+        const bodyRef = useRef<HTMLElement>(null);
+        const handleMouseUp = useCallback(() => {
+            const sel = window.getSelection();
+            const text = sel?.toString().trim();
+            if (!sel || !text || text.length < 2 || !bodyRef.current) {
+                onSelection(null);
+                return;
+            }
+            const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+            if (!range || !bodyRef.current.contains(range.commonAncestorContainer)) {
+                onSelection(null);
+                return;
+            }
+            const rect = range.getBoundingClientRect();
+            onSelection({
+                text: text.slice(0, 1200),
+                x: Math.max(12, Math.min(rect.left, window.innerWidth - 220)),
+                y: Math.max(12, rect.top - 52)
+            });
+        }, [onSelection]);
+        return (
+            <article
+                ref={bodyRef}
+                className={styles.readerBody}
+                onMouseUp={handleMouseUp}
+                onTouchEnd={handleMouseUp}
+                dangerouslySetInnerHTML={{ __html: content || buildFallbackHtml(excerpt) }}
+            />
+        );
+    }
+);
+ArticleBody.displayName = "ArticleBody";
+
 const ReaderInner = () => {
     const searchParams = useSearchParams();
     const id = searchParams?.get("id") ?? undefined;
     const { article, isLoading, ensureContent, markReading, toggleFavoriteArticle } = useArticle(id);
     const { openWith, openFreeform } = useChat();
-    const bodyRef = useRef<HTMLDivElement>(null);
     const [selection, setSelection] = useState<SelectionState | null>(null);
     const [status, setStatus] = useState<string | null>(null);
 
@@ -52,26 +100,6 @@ const ReaderInner = () => {
     const clearSelection = useCallback(() => {
         setSelection(null);
         window.getSelection()?.removeAllRanges();
-    }, []);
-
-    const onMouseUp = useCallback(() => {
-        const sel = window.getSelection();
-        const text = sel?.toString().trim();
-        if (!sel || !text || text.length < 2 || !bodyRef.current) {
-            setSelection(null);
-            return;
-        }
-        const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-        if (!range || !bodyRef.current.contains(range.commonAncestorContainer)) {
-            setSelection(null);
-            return;
-        }
-        const rect = range.getBoundingClientRect();
-        setSelection({
-            text: text.slice(0, 1200),
-            x: Math.max(12, Math.min(rect.left, window.innerWidth - 220)),
-            y: Math.max(12, rect.top - 52)
-        });
     }, []);
 
     const askAI = async () => {
@@ -177,17 +205,7 @@ const ReaderInner = () => {
                 </div>
             )}
 
-            <article
-                ref={bodyRef}
-                className={styles.readerBody}
-                onMouseUp={onMouseUp}
-                onTouchEnd={onMouseUp}
-                dangerouslySetInnerHTML={{
-                    __html:
-                        article.content ||
-                        `<p>${(article.excerpt || "正文还没有抓取成功,可以打开原文链接阅读。").replace(/</g, "&lt;")}</p>`
-                }}
-            />
+            <ArticleBody content={article.content} excerpt={article.excerpt} onSelection={setSelection} />
 
             {selection && (
                 <div className={styles.selectionToolbar} style={{ left: selection.x, top: selection.y }}>
